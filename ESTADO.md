@@ -76,6 +76,11 @@
 > - **Las dos luces del acto VI** (`acto6.ts`; lo anterior en `respaldo/acto6.v3.ts.txt`): ya no hay cuerda. Dan dos vueltas una alrededor de la otra durante la subida, se acercan y se apartan, una va delante y luego la otra; entre ellas va y viene luz por muchos caminos (`lazo`, tipo 0) y cada una deja una estela que se queda atrás (tipos 1 y 2). Al final se aquietan (`juego` → 0) y quedan lado a lado, de frente.
 > - Sin pruebas completas (se corren al cerrar). `tsc` limpio.
 >
+> **14 de noviembre · Dos tirones más y la subida a GitHub** (Diego: en 101 atm «aún hay una breve pausita»; en 1065 atm, con `A` está bien pero con scroll se siente abrupto):
+> - **101 atm (II → III):** el acto II frenaba hasta quedarse quieto y después esperaba 0,9 beats, y el III partía desde quieto. Ahora el II sigue bajando a ritmo parejo hasta el final y el III abre ya cayendo (su primer tramo es lineal y parte en `y` 1,5).
+> - **1065 atm (la llegada al fondo):** con scroll, los 4 beats de la llegada se cruzaban en un segundo. Ahora cada acto puede pedir un freno (`freno` en `Instancia`, aplicado en `frame()` de `src/main.ts`): durante la llegada el scroll va a 0,8 beats por segundo como mucho (la reproducción va a 0,45), entra y sale de a poco, y no frena un salto largo (más de 14 beats). **No se probó con scroll de verdad** (el panel del navegador estaba oculto); `tsc` y `npm run build` limpios.
+> - **Repo:** `git init` y primer historial en `github.com/drayzu/Abismo` (commits por partes: base, motor, estudios, cada acto, el viaje, herramientas, documentos, despliegue a Pages, y los dos arreglos). Antes no había ningún commit.
+>
 > **La ayuda ya no nombra ningún país:** el final y la lámina del acto IV dicen solo «findahelpline.com · líneas de ayuda de tu país, gratis». Decisión del asistente para cumplir la regla; Diego no la ha confirmado (se pierde el número directo \*4141).
 >
 > - Lo que sigue más abajo describe el resto del viaje, que Diego considera flojo y está por rehacer con este criterio.
@@ -96,7 +101,7 @@
 - **Pruebas:** `node tools/pruebas.mjs` (con el servidor andando; tarda unos veinte minutos; no guardar nada en la carpeta mientras corre). **Última corrida, 12–13 de noviembre: una falla.** 0 errores en 2 624 cuadros, ningún cuadro negro, saltar = llegar (0,00 % en 55 saltos), cuadro más caro 3,9 ms; pero dos tramos quietos, 200,75–208 y 211,5–213,5 (el final del fondo y la espera antes de las primeras chispas). Se corrigió después (las chispas despiertan antes, y el margen de la excepción del fondo pasó de 1 a 2 beats) y **no se volvió a correr.** Resultado en `docs/viaje/pruebas.txt`.
 - **Hojas:** `docs/viaje/todo.jpg` (el viaje entero con el guion v2) y `docs/viaje/nuevas.jpg` (los otros, la llamada, los seres). Las demás hojas de `docs/viaje/` son de antes del guion v2.
 - **Los estudios** siguen en `http://localhost:5206/estudios/index.html`.
-- No hay repo git.
+- Repo: github.com/drayzu/Abismo (rama main; Pages se despliega con cada push).
 
 ## Los seis estudios
 
