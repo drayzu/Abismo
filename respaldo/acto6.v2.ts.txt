@@ -1,0 +1,391 @@
+import * as THREE from 'three';
+import { Timeline } from './timeline';
+import { pantalla } from '../src/engine/pantalla';
+import { enfocar, materia, materiaBuilder } from '../src/engine/materia';
+import { gauss, smoothstep } from '../src/engine/math';
+import { FONT, ink, type Rotulo } from './placa';
+import { BIO, CARMIN, ease, FONDO_M, SEGURO, TU, V } from './comun';
+import { marYCiudad } from './gota';
+import { nevar } from './nieve';
+import { ruidoJS } from './acto3';
+import { ARRIBA, rayos, ultimos } from './acto2';
+import type { Escena, Frame, Instancia } from './tipos';
+
+/**
+ * Act VI · The way up (all the zones backwards, 1 100 → 1 atm, until dawn), as one long take
+ * (13 Nov 2026; Diego: the act with most to give, and it was being wasted). What it replaces was
+ * two lights in the middle of the frame, snow, and a flat diagram of bars of colour.
+ *
+ * The camera goes round the two lights, yours and the other one with the thread between them,
+ * all the way up: one full turn in eleven kilometres. It starts over them, looking down: the plain
+ * of living lights falls away, and in it the spiral, which from here is a galaxy; the work opened
+ * falling out of one. The camera comes down beside you and then under you, among jellyfish that
+ * rise at their own pace. Far above, the first blue; then its shafts, the same ones of act II, and
+ * you go up among them while everything that went up last night comes back down past you. Then the
+ * green begins, the yellow, the orange, the red: you go up through each colour where the water
+ * lets it start, and this time it is the Sun, so they are whole. Over you the surface is a circle
+ * of dawn. You cross it. It is not raining. The same city as in the opening, across the water, in
+ * the first light. The last sentence and, under it, where to find help (BRIEF § Cuidado, 5). It
+ * ends in two points.
+ *
+ * It is not a happy ending: the sentence does not promise anything, and the dawn is the first
+ * light, not a blaze.
+ */
+
+/** How far under the surface (y = 0) the floor is, in units. */
+const SUELO = 364;
+/** Where the spiral lies on the plain. */
+const ESPIRAL = V(15, -SUELO + 0.6, -15);
+
+/**
+ * What lives down here. Kinds: 0 a spark (the plain, the spiral, the water); 1 the bell of a
+ * jellyfish; 2 what hangs from it. `aC` is the centre of the animal a point belongs to and `aFase`
+ * its own time.
+ */
+function vida() {
+  const b = materiaBuilder(141);
+  const r = b.r;
+  const c = new THREE.Color();
+  const aC: number[] = [];
+  const aFase: number[] = [];
+  const f = ruidoJS(41);
+  const tinte = () => {
+    const k = r();
+    if (k < 0.62) c.copy(BIO).lerp(new THREE.Color(0.35, 0.8, 1.0), r() * 0.6);
+    else if (k < 0.88) c.setRGB(0.2, 0.9, 0.85);
+    else c.setRGB(0.55, 0.45, 1.0);
+    return c;
+  };
+  const pon = (x: number, y: number, z: number, col: THREE.Color, s: number, luz: number, kind: number, cx = 0, cy = 0, cz = 0, fase = 0) => {
+    b.push(x, y, z, col, s, luz, { kind });
+    aC.push(cx, cy, cz);
+    aFase.push(fase);
+  };
+  // The plain: a country of sparks, in patches, as far as you can see from above.
+  for (let n = 0; n < 150000; ) {
+    const d = 190 * Math.sqrt(r());
+    const a = r() * Math.PI * 2;
+    const x = Math.cos(a) * d;
+    const z = Math.sin(a) * d;
+    if (f(x * 0.035 + 9, z * 0.035) * 1.7 - 0.25 < r()) continue;
+    pon(x, -SUELO + Math.abs(gauss(r)) * 1.4, z, tinte(), 0.11, 0.7 + 1.3 * r(), 0);
+    n++;
+  }
+  // The spiral: one animal, a colony coiled like a galaxy.
+  for (let i = 0; i < 46000; i++) {
+    const t = Math.pow(r(), 0.75);
+    const brazo = Math.floor(r() * 2);
+    const ang = t * 11 + brazo * Math.PI + gauss(r) * 0.07;
+    const rad = 0.6 + 12.5 * t + gauss(r) * (0.12 + 0.5 * t);
+    c.setRGB(0.85, 0.92, 1.0).lerp(BIO, t * 0.8);
+    pon(ESPIRAL.x + Math.cos(ang) * rad, ESPIRAL.y + gauss(r) * 0.2 * (1 - t), ESPIRAL.z + Math.sin(ang) * rad, c, 0.07, 0.85 - 0.5 * t, 0);
+  }
+  // Sparks in the water, all the way up to where the light begins; fewer the higher.
+  for (let i = 0; i < 130000; i++) {
+    const d = 3 + 46 * Math.sqrt(r());
+    const a = r() * Math.PI * 2;
+    pon(Math.cos(a) * d, -SUELO + 250 * Math.pow(r(), 1.5), Math.sin(a) * d, tinte(), 0.085, 0.5 + 1.1 * r(), 0);
+  }
+  // Jellyfish, near and far, each rising at its own pace. One of them is enormous.
+  const medusa = (cx: number, cy: number, cz: number, R: number) => {
+    const fase = r() * 40;
+    const col = tinte().clone();
+    const palida = col.clone().lerp(new THREE.Color(0.9, 0.95, 1.0), 0.5);
+    const n = Math.round(700 + 500 * R);
+    for (let i = 0; i < n; i++) {
+      // The bell: more of it on its ribs and at its rim.
+      const th = Math.acos(1 - r() * (r() < 0.3 ? 1 : 0.35) - (r() < 0.3 ? 0 : 0.65));
+      let fi = r() * Math.PI * 2;
+      const costilla = r() < 0.55;
+      if (costilla) fi = (Math.round((fi / (Math.PI * 2)) * 14) / 14) * Math.PI * 2;
+      pon(cx + R * Math.sin(th) * Math.cos(fi), cy + R * 0.75 * Math.cos(th), cz + R * Math.sin(th) * Math.sin(fi), costilla ? palida : col, 0.05, costilla ? 0.9 : 0.45, 1, cx, cy, cz, fase);
+    }
+    const hilos = 10 + Math.floor(r() * 6);
+    for (let h = 0; h < hilos; h++) {
+      const fi = (h / hilos) * Math.PI * 2 + r() * 0.3;
+      const largo = R * (2.2 + 2.6 * r());
+      const centro = h % 3 === 0;
+      const rr = centro ? R * 0.25 : R * 0.96;
+      for (let i = 0; i < 90; i++) {
+        const t = i / 89;
+        pon(cx + rr * Math.cos(fi) * (1 - 0.3 * t), cy - t * largo * (centro ? 0.6 : 1), cz + rr * Math.sin(fi) * (1 - 0.3 * t), centro ? palida : col, 0.04, (centro ? 0.8 : 0.5) * (1 - 0.75 * t), 2, cx, cy, cz, fase);
+      }
+    }
+  };
+  for (let k = 0; k < 120; k++) {
+    const d = 3.5 + 26 * Math.pow(r(), 0.9);
+    const a = r() * Math.PI * 2;
+    medusa(Math.cos(a) * d, -SUELO + 22 + 215 * r(), Math.sin(a) * d, 0.35 + 1.1 * r() * r());
+  }
+  medusa(-6.5, -SUELO + 112, -4.5, 3.4);
+  return materia(b.data(), {
+    pre: /* glsl */ `
+      attribute vec3 aC;
+      attribute float aFase;
+      uniform float uVida, uPlano;
+      ${SEGURO}`,
+    move: /* glsl */ `
+      if (aKind < 0.5) {
+        em *= (p.y < ${(-SUELO + 8).toFixed(1)} ? uPlano : uVida) * (0.35 + 0.65 * pw(0.5 + 0.5 * sin(uTime * (0.6 + seed * 1.6) + seed * 90.0), 2.0));
+      } else {
+        vec3 rel = p - aC;
+        // It swims: the bell closes and opens, and what hangs from it follows late.
+        float late = sin(uTime * 1.1 + aFase);
+        if (aKind < 1.5) {
+          float borde = smoothstep(0.9, 0.0, rel.y / max(length(rel), 1e-4));
+          rel.xz *= 1.0 - 0.16 * late * borde;
+        } else {
+          float abajo = clamp(-rel.y, 0.0, 30.0);
+          rel.xz *= 1.0 - 0.16 * sin(uTime * 1.1 + aFase - 0.5 * abajo) / (1.0 + 0.3 * abajo);
+          rel.x += 0.12 * abajo * sin(uTime * 0.6 + aFase + abajo * 0.7);
+          rel.z += 0.12 * abajo * cos(uTime * 0.5 + aFase * 1.3 + abajo * 0.6);
+        }
+        p = aC + rel;
+        p.y += 0.4 * sin(uTime * 0.3 + aFase);
+        em *= uVida * (0.7 + 0.3 * late);
+      }`,
+    uniforms: { uVida: { value: 1 }, uPlano: { value: 1 } },
+    extra: { aC: [new Float32Array(aC), 3], aFase: [new Float32Array(aFase), 1] },
+  });
+}
+
+const FONDO = /* glsl */ `
+  uniform float uM, uSobre, uCielo, uAzul;
+  ${SEGURO}
+  void main() {
+    vec3 d = normalize(vDir);
+    // Under: the water takes its colour back as you come up, and the dawn comes down through it.
+    float up = smoothstep(-0.6, 1.0, d.y);
+    // (Kept under what the bloom takes for a light: a bright sky of water turns into one white stain.)
+    vec3 agua = mix(vec3(0.003, 0.014, 0.05), vec3(0.012, 0.1, 0.14), exp(-uM / 45.0)) * uAzul * (0.1 + 0.9 * exp(-uM / 240.0)) * (0.25 + 1.1 * up);
+    agua += vec3(0.42, 0.24, 0.15) * exp(-uM / 14.0) * pw(up, 3.0) * 0.16;
+    // Over: the sky at dawn, and the first light where the Sun is going to be.
+    float alto = smoothstep(-0.04, 0.6, d.y);
+    vec3 cielo = mix(vec3(1.0, 0.56, 0.36), vec3(0.2, 0.27, 0.42), pw(alto, 0.6)) * 0.2;
+    cielo += vec3(1.0, 0.5, 0.26) * exp(-d.y * d.y * 22.0) * exp(-d.x * d.x * 1.6) * step(d.z, 0.0) * 0.13;
+    cielo *= (0.25 + 0.75 * smoothstep(-0.08, 0.02, d.y)) * uCielo;
+    gl_FragColor = vec4(mix(agua, cielo, uSobre), 1.0);
+  }
+`;
+
+export const acto6: Escena = {
+  id: 'acto6',
+  nombre: 'Acto VI',
+  estilos: [{ key: '1', nombre: 'El acto', nota: 'Una vuelta entera alrededor de las dos luces mientras suben: la llanura y la espiral desde arriba, las medusas, las columnas azules, todos los que bajan, cada color, la superficie al amanecer y la ciudad.' }],
+  montar(stage): Instancia {
+    const root = stage.root;
+    const { camera } = stage;
+    stage.bloom.strength = 0.6;
+    stage.bloom.radius = 0.7;
+    stage.bloom.threshold = 0.2;
+    stage.finish.uniforms.uGrain.value = 0.03;
+    stage.finish.uniforms.uVignette.value = 0.65;
+
+    const film = pantalla(FONDO, { uM: { value: FONDO_M }, uSobre: { value: 0 }, uCielo: { value: 0 }, uAzul: { value: 0 } });
+    root.add(film.mesh);
+
+    const mundo = marYCiudad({ lleno: 1, aro: 1, espejo: 1 });
+    mundo.u.uAlba.value = 1;
+    const vivas = vida();
+    // The Sun's rays: their top is the surface.
+    const luces = rayos(true);
+    luces.points.position.y = -ARRIBA;
+    const bajan = ultimos();
+    const snow = nevar(26000, 0);
+    snow.u.uCol.value.setRGB(0.7, 0.8, 0.9);
+    snow.u.uI.value = 0;
+    root.add(mundo.points, vivas.points, luces.points, bajan.points, snow.points);
+
+    const b = materiaBuilder(91);
+    b.push(-0.26, 0, 0, TU, 0.03, 1);
+    b.push(0.26, 0.04, 0, CARMIN, 0.03, 1.5);
+    const dos = materia(b.data());
+    dos.u.uFuente.value = 1;
+    const bh = materiaBuilder(92);
+    for (let i = 0; i < 140; i++) {
+      const t = i / 139;
+      bh.push(-0.26 + 0.52 * t, 0.04 * t + 0.03 * Math.sin(t * Math.PI), 0, TU.clone().lerp(CARMIN, t), 0.007, 0.8);
+    }
+    const hilo = materia(bh.data(), { move: /* glsl */ `p.y += 0.012 * sin(p.x * 14.0 + uTime * 0.7);` });
+    const par = new THREE.Group();
+    par.add(dos.points, hilo.points);
+    root.add(par);
+
+    const tl = new Timeline();
+    // y: the two lights' height (0 is the surface); D, pitch, yaw, fov: the camera, which goes
+    // round them (pitch below 0: it is over them, looking down); gira: the pair turning; m, min:
+    // the clock; plano: the plain you leave; vida: what lives in the water; azul: the blue of the
+    // water; rayos: the Sun's rays; bajan, baj: everything that went up last night, going back down
+    // past you; mundo, cielo: the surface and the sky; parY: the two lights lower in the frame;
+    // par, frase, ayuda, hud: the end.
+    tl.set({ y: -SUELO + 4, D: 2.6, pitch: -0.75, yaw: 0.3, fov: 56, gira: 0, m: FONDO_M, min: 260, plano: 1, vida: 1, azul: 0, rayos: 0, bajan: 0, baj: 0, mundo: 0, cielo: 0, parY: 0, par: 1, frase: 0, ayuda: 0, hud: 1 });
+    tl.label('sube').caption(9.0, 'Subir acompañado', 'Las luces suben contigo.');
+    // Over the two of you, looking down: the plain falls away, and the spiral in it.
+    tl.to(4.5, { y: -SUELO + 26, pitch: -0.95, yaw: 0.9, D: 3.4, m: 9000, min: 275 });
+    tl.to(4.5, { y: -SUELO + 70, pitch: 0.15, yaw: 1.7, D: 3.0, m: 6500, min: 292, plano: 0.6 });
+    tl.label('cerca').caption(10.0, 'De cerca', 'El universo no te da un sentido. Tampoco te lo quita. Ese se hace de cerca.');
+    tl.to(4.0, { y: -SUELO + 105, D: 1.5, pitch: 0.3, yaw: 2.5, gira: 1.2, fov: 50, m: 4200, min: 310, plano: 0 });
+    tl.to(6.0, { y: -SUELO + 150, D: 2.2, pitch: 0.7, yaw: 3.2, gira: 2.2, m: 1500, min: 330 });
+    // Under you now, looking up: far above, the first blue, and then its shafts.
+    tl.label('azul').caption(8.0, 'Vuelve el azul', 'Arriba amanece. Primero vuelve el azul.');
+    tl.to(8.0, { y: -149, pitch: 1.0, yaw: 3.8, D: 2.8, fov: 64, m: 400, min: 356, azul: 1, rayos: 1, bajan: 0.6, baj: 3, vida: 0.5 });
+    tl.label('bajan').caption(8.0, 'Todos bajan', 'Todo lo que subió anoche vuelve a bajar. Tú subes.');
+    tl.to(8.0, { y: -64, pitch: 0.35, yaw: 4.5, m: 120, min: 372, bajan: 1, baj: 11, vida: 0.15 });
+    // Up through each colour, where the water lets it begin.
+    tl.label('colores').caption(10.0, 'Y lo demás', 'Después el verde. El amarillo. Al final, el rojo.');
+    tl.to(5.0, { y: -24, pitch: 0.8, yaw: 5.1, fov: 76, m: 45, min: 384, bajan: 0.3, baj: 15, mundo: 0.6, cielo: 1 });
+    tl.to(5.0, { y: -6, pitch: 1.1, yaw: 5.6, D: 3.2, m: 7, min: 392, bajan: 0, baj: 17, mundo: 1, vida: 0 });
+    tl.label('superficie').caption(8.0, 'La superficie', 'Amanece. Ya no llueve.');
+    tl.to(2.6, { y: -0.6, pitch: 0.9, yaw: 5.9, m: 0.5, min: 395 });
+    tl.to(2.4, { y: 1.0, pitch: 0.4, yaw: 6.1, fov: 60, m: 0, rayos: 0, min: 397 });
+    tl.to(3.0, { y: 1.3, pitch: 0.03, yaw: Math.PI * 2, fov: 44, D: 2.6, parY: 0.34, min: 400 });
+    tl.label('final').caption(4.0, 'La ciudad', 'La misma. Con la primera luz.');
+    // It keeps rising, very slowly, to the end: the day goes on coming.
+    tl.with(11.4, { y: 2.4 }, (t) => t);
+    tl.to(4.0, { min: 402, par: 0.8 });
+    tl.label('frase');
+    tl.to(1.8, { frase: 1, hud: 0 });
+    tl.to(1.6, { ayuda: 1 });
+    tl.wait(2.0);
+    // It ends as Mente did, in two points: yours, and the other's.
+    tl.to(2.0, { par: 1 });
+
+    const dir = V();
+    const P = V();
+    const YAW_BAJAN = tl.get('yaw', tl.at('bajan') + 4);
+
+    return {
+      tl,
+      luzEntrada: TU.clone(),
+      cuenta: (p) => ({ m: tl.get('m', p), min: tl.get('min', p), a: tl.get('hud', p) }),
+      rotulo(p): Rotulo | null {
+        const cp = tl.captionAt(p);
+        return cp && p < tl.at('frase') ? { capitulo: 'VI · La subida', name: cp.name, fact: cp.fact } : null;
+      },
+      marca: (p) => tl.get('hud', p),
+      placa(g, f) {
+        const u = f.u;
+        const fr = tl.get('frase', f.p);
+        if (fr > 0.01) {
+          g.save();
+          g.globalAlpha = fr;
+          g.textAlign = 'center';
+          g.shadowColor = 'rgba(0,0,0,0.85)';
+          g.shadowBlur = 24 * u;
+          g.font = FONT.italic(54 * u);
+          g.fillStyle = ink();
+          // Provisional: the last sentence is Diego's to decide (BRIEF, open decision 5).
+          g.fillText('Todavía estás aquí.', f.W / 2, f.H * 0.42);
+          g.restore();
+        }
+        const ay = tl.get('ayuda', f.p);
+        if (ay > 0.01) {
+          g.save();
+          g.globalAlpha = ay * 0.85;
+          g.textAlign = 'center';
+          g.shadowColor = 'rgba(0,0,0,0.9)';
+          g.shadowBlur = 12 * u;
+          g.font = FONT.sans(16 * u);
+          g.fillStyle = ink(0.9);
+          g.fillText('Si lo estás pensando, habla hoy con alguien.', f.W / 2, f.H - 92 * u);
+          g.font = FONT.mono(11.5 * u);
+          g.letterSpacing = `${1.2 * u}px`;
+          g.fillStyle = ink(0.78);
+          g.fillText('FINDAHELPLINE.COM  ·  LÍNEAS DE AYUDA DE TU PAÍS, GRATIS', f.W / 2, f.H - 64 * u);
+          g.restore();
+        }
+      },
+      update(f: Frame) {
+        const p = f.p;
+        const y = tl.get('y', p);
+        const yaw = tl.get('yaw', p) + 0.01 * Math.sin(f.time * 0.11);
+        const pitch = tl.get('pitch', p) + 0.006 * Math.sin(f.time * 0.14);
+        const D = tl.get('D', p);
+        camera.near = 0.03;
+        camera.far = 700;
+        camera.fov = tl.get('fov', p);
+        // The camera goes round the two lights, and looks at them; at the end they sit lower in the frame.
+        P.set(0, y, 0);
+        dir.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
+        const baja = tl.get('parY', p) * 0.9;
+        camera.position.set(P.x - dir.x * D, P.y - dir.y * D + baja, P.z - dir.z * D);
+        camera.up.set(0, 1, 0);
+        camera.lookAt(camera.position.x + dir.x, camera.position.y + dir.y, camera.position.z + dir.z);
+        camera.updateMatrixWorld();
+        const sobre = smoothstep(-0.05, 0.12, camera.position.y);
+
+        const m = tl.get('m', p);
+        const mu = tl.get('mundo', p);
+        film.u.uM.value = m;
+        film.u.uSobre.value = sobre;
+        film.u.uCielo.value = tl.get('cielo', p);
+        film.u.uAzul.value = tl.get('azul', p);
+
+        mundo.points.visible = mu > 0.001;
+        enfocar(mundo, f.focal, f.dpr, f.time);
+        mundo.u.uMinPx.value = 1.5 * f.dpr;
+        mundo.u.uMaxPx.value = 9 * f.dpr;
+        // From below, close to it, the circle of the sky would burn the frame.
+        const h = Math.min(1, Math.max(0, -camera.position.y / 30));
+        mundo.u.uGain.value = (0.3 * Math.max(0.3, h) * (1 - sobre) + 0.8 * sobre) * mu;
+        (mundo.u.uCam.value as THREE.Vector3).copy(camera.position);
+
+        const vi = tl.get('vida', p);
+        const pl = tl.get('plano', p);
+        vivas.points.visible = vi + pl > 0.002;
+        enfocar(vivas, f.focal, f.dpr, f.time);
+        vivas.u.uMinPx.value = 1.5 * f.dpr;
+        vivas.u.uMaxPx.value = 10 * f.dpr;
+        vivas.u.uGain.value = 1.5;
+        vivas.u.uFog.value = 230;
+        vivas.u.uVida.value = vi;
+        vivas.u.uPlano.value = pl;
+
+        const ra = tl.get('rayos', p);
+        luces.points.visible = ra > 0.001 && sobre < 0.99;
+        enfocar(luces, f.focal, f.dpr, f.time);
+        luces.u.uMinPx.value = 1.4 * f.dpr;
+        luces.u.uMaxPx.value = 9 * f.dpr;
+        luces.u.uGain.value = 2.2 * (1 - sobre) * Math.min(1, Math.max(0.25, -camera.position.y / 16));
+        luces.u.uTecho.value = 1;
+        luces.u.uFog.value = 420;
+        luces.u.uFrente.value = 20;
+        luces.u.uRayos.value = ra;
+        luces.u.uAzul.value = 1;
+        luces.u.uCorte.value = -1000;
+
+        const ba = tl.get('bajan', p);
+        bajan.points.visible = ba > 0.002;
+        enfocar(bajan, f.focal, f.dpr, f.time);
+        bajan.u.uMinPx.value = 1.8 * f.dpr;
+        bajan.u.uGain.value = 2.2;
+        bajan.u.uSuben.value = ba;
+        bajan.u.uSub.value = -tl.get('baj', p);
+        // They pass close to the camera, on the side it looks to.
+        bajan.u.uY.value = camera.position.y;
+        bajan.points.position.set(camera.position.x, 0, camera.position.z);
+        bajan.points.rotation.y = -YAW_BAJAN;
+
+        // Specks in the water, staying where they are while you go up past them.
+        snow.points.visible = sobre < 0.5;
+        snow.points.position.copy(camera.position);
+        snow.u.uTime.value = f.time;
+        snow.u.uFocal.value = f.focal;
+        snow.u.uDpr.value = f.dpr;
+        snow.u.uCae.value = 0.75 * camera.position.y;
+        snow.u.uAmb.value = 0.05 + 0.1 * tl.get('azul', p);
+
+        par.position.copy(P);
+        par.rotation.y = -yaw + tl.get('gira', p);
+        const k = tl.get('par', p);
+        enfocar(dos, f.focal, f.dpr, f.time);
+        dos.u.uMinPx.value = 5.5 * f.dpr;
+        dos.u.uGain.value = 2.8 * k * (0.93 + 0.07 * Math.sin(f.time * 1.0));
+        enfocar(hilo, f.focal, f.dpr, f.time);
+        hilo.u.uMinPx.value = 1.6 * f.dpr;
+        hilo.u.uGain.value = 1.1 * k * (1 - 0.5 * ease(0, 1, sobre));
+      },
+      dispose() {},
+    };
+  },
+};

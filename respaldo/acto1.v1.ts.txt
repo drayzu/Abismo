@@ -1,0 +1,449 @@
+import * as THREE from 'three';
+import { Timeline } from './timeline';
+import { enfocar, materia, materiaBuilder, type Nube } from '../src/engine/materia';
+import { clamp, gauss, smoothstep } from '../src/engine/math';
+import { ac, FONT, ink, pensamiento, type Rotulo } from './placa';
+import { ease, SEGURO, TU, V } from './comun';
+import { marYCiudad } from './gota';
+import { nevar } from './nieve';
+import type { Escena, Frame, Instancia } from './tipos';
+
+/**
+ * The opening and act I, as one scene with no cut (BRIEF § El viaje, with what Diego chose in the
+ * studies).
+ *
+ * Opening · After the immense. Everything the other works showed: the cosmic web. Then the fall:
+ * each thing is a point of light inside the one before (the web, a galaxy, the Earth at night, a
+ * city), as in Mente. The city across the water, in the rain. The rain does not stop at the water:
+ * the camera crosses the surface, and the title comes up under it.
+ *
+ * Act I · Solitude (the sunlit zone, 1 → 20 atm). What is left above: from below, everything fits
+ * in a circle (Snell's window), and it gets further with every metre. The school: thousands of
+ * fish that move as one body, and you outside it. The message that is written and erased, and
+ * never sent (only its words: the room it was in is gone, Diego did not want it).
+ *
+ * Guion v2: it opens on the two points Mente ends in (the white one leaves), and on the way down
+ * you meet everything that lives below going up, as it does every night.
+ *
+ * The world is small (metres near the surface); the real depth is only what the clock says.
+ */
+
+const CAP0 = 'Apertura · Después de lo inmenso';
+const CAP1 = 'I · Soledad';
+
+// ---------------------------------------------------------------- the fall's three stages
+
+/** The cosmic web: knots, and threads of galaxies between those that are near. */
+function red() {
+  const b = materiaBuilder(71);
+  const r = b.r;
+  const c = new THREE.Color();
+  const nudos: [number, number, number][] = [];
+  for (let i = 0; i < 70; i++) nudos.push([(r() - 0.5) * 9, (r() - 0.5) * 6, (r() - 0.5) * 9]);
+  nudos[0] = [0, 0, 0];
+  for (const [i, n] of nudos.entries()) {
+    for (let k = 0; k < 260; k++) {
+      c.setRGB(0.8, 0.84, 1.0).lerp(new THREE.Color(1.0, 0.82, 0.7), r() * 0.6);
+      b.push(n[0] + gauss(r) * 0.22, n[1] + gauss(r) * 0.22, n[2] + gauss(r) * 0.22, c, 0.012, 0.7);
+    }
+    const cerca = nudos
+      .map((m, j) => [j, Math.hypot(m[0] - n[0], m[1] - n[1], m[2] - n[2])] as const)
+      .filter(([j]) => j !== i)
+      .sort((x, y) => x[1] - y[1])
+      .slice(0, 3);
+    for (const [j] of cerca) {
+      if (j < i) continue;
+      const m = nudos[j];
+      for (let k = 0; k < 190; k++) {
+        const t = r();
+        c.setRGB(0.62, 0.7, 1.0);
+        b.push(n[0] + (m[0] - n[0]) * t + gauss(r) * 0.07, n[1] + (m[1] - n[1]) * t + gauss(r) * 0.07, n[2] + (m[2] - n[2]) * t + gauss(r) * 0.07, c, 0.01, 0.45);
+      }
+    }
+  }
+  return materia(b.data());
+}
+
+/** A spiral galaxy, tilted, placed so that the origin falls on one of its arms (that is where we go). */
+function galaxia() {
+  const b = materiaBuilder(72);
+  const r = b.r;
+  const c = new THREE.Color();
+  const cs = Math.cos(1.0);
+  const sn = Math.sin(1.0);
+  const destino = [0.62 * Math.cos(2.1), 0, 0.62 * Math.sin(2.1)];
+  for (let i = 0; i < 26000; i++) {
+    const bulbo = r() < 0.2;
+    let x: number, y: number, z: number;
+    if (bulbo) {
+      const [sx, sy, sz] = b.onSphere();
+      const rad = 0.18 * Math.pow(r(), 1.5);
+      x = sx * rad;
+      y = sy * rad * 0.6;
+      z = sz * rad;
+      c.setRGB(1.0, 0.82, 0.6);
+    } else {
+      const rad = 0.12 + 1.25 * Math.pow(r(), 0.8);
+      const brazo = Math.floor(r() * 2) * Math.PI;
+      const a = brazo + Math.log(rad / 0.12) * 2.4 + gauss(r) * 0.32;
+      x = Math.cos(a) * rad;
+      z = Math.sin(a) * rad;
+      y = gauss(r) * 0.02;
+      c.setRGB(0.72, 0.8, 1.0).lerp(new THREE.Color(1.0, 0.75, 0.75), r() < 0.08 ? 1 : 0);
+    }
+    x -= destino[0];
+    z -= destino[2];
+    // Tilt round x, so we see it at an angle.
+    b.push(x, y * cs - z * sn, y * sn + z * cs, c, 0.006, bulbo ? 0.8 : 0.5);
+  }
+  return materia(b.data());
+}
+
+/** The Earth at night: the lights of its cities, and a thin blue edge. Its nearest point is the origin. */
+function tierra() {
+  const b = materiaBuilder(73);
+  const r = b.r;
+  const c = new THREE.Color();
+  const tierraEn = (x: number, y: number, z: number) => Math.sin(x * 3.1 + 1.0) * Math.sin(y * 2.7 + 0.4) + 0.6 * Math.sin(z * 4.3 + x * 2.0) + 0.35 * Math.sin(y * 7.0 + z * 5.0);
+  let n = 0;
+  while (n < 15000) {
+    const [x, y, z] = b.onSphere();
+    const t = tierraEn(x, y, z);
+    // Lights gather on land, and on some land more than on other.
+    if (t < 0.25 || r() > 0.25 + 0.75 * Math.pow(Math.max(0, Math.sin(x * 9 + y * 13) * Math.sin(z * 11 + 2)), 2)) continue;
+    c.setRGB(1.0, 0.72, 0.38);
+    b.push(x, y, z - 1, c, 0.005, 0.6 + 0.8 * r());
+    n++;
+  }
+  // The city we fall to, alone on its coast.
+  for (let i = 0; i < 260; i++) {
+    c.setRGB(1.0, 0.78, 0.45);
+    b.push(gauss(r) * 0.02, gauss(r) * 0.02, -0.0004 * r(), c, 0.004, 1.2);
+  }
+  for (let i = 0; i < 2600; i++) {
+    const a = r() * Math.PI * 2;
+    c.setRGB(0.3, 0.55, 1.0);
+    b.push(Math.cos(a) * 1.006, Math.sin(a) * 1.006, -1 + gauss(r) * 0.03, c, 0.006, 0.5);
+  }
+  return materia(b.data());
+}
+
+// ---------------------------------------------------------------- the school
+
+function cardumen() {
+  const b = materiaBuilder(74);
+  const r = b.r;
+  const c = new THREE.Color();
+  const aU: number[] = [];
+  const aO: number[] = [];
+  const aS: number[] = [];
+  for (let i = 0; i < 5200; i++) {
+    const u = r();
+    const a = r() * Math.PI * 2;
+    const rad = Math.sqrt(r());
+    for (let k = 0; k < 3; k++) {
+      c.setRGB(0.62, 0.76, 0.98);
+      b.push(0, 0, 0, c, 0.008, k === 0 ? 1.0 : 0.45);
+      aU.push(u);
+      aO.push(Math.cos(a) * rad, Math.sin(a) * rad * 0.7);
+      aS.push(k);
+    }
+  }
+  return materia(b.data(), {
+    pre: /* glsl */ `
+      attribute float aU, aS;
+      attribute vec2 aO;
+      uniform vec3 uCentro, uTu;
+      uniform float uGiro;
+      ${SEGURO}`,
+    move: /* glsl */ `
+      // A ring of fish that goes round: one body. It swells and thins as a wave runs along it.
+      float sv = aU * 6.2832 + uTime * 0.1 + uGiro;
+      float R = 3.4;
+      vec3 C = vec3(R * cos(sv), 0.5 * sin(2.0 * sv), R * sin(sv));
+      vec3 T = normalize(vec3(-R * sin(sv), cos(2.0 * sv), R * cos(sv)));
+      vec3 N = normalize(cross(T, vec3(0.0, 1.0, 0.0)));
+      vec3 B = cross(N, T);
+      float ancho = 0.8 * (1.0 + 0.35 * sin(3.0 * sv - uTime * 0.5));
+      p = uCentro + C + (N * aO.x + B * aO.y) * ancho - T * aS * 0.035;
+      // It never touches you: it opens as it passes your light, and closes behind.
+      vec3 dt = p - uTu;
+      float dl = length(dt);
+      p += dt / max(dl, 1e-3) * 0.6 * exp(-dl * dl / 0.4);
+      p += N * 0.012 * sin(uTime * 7.0 + seed * 40.0) * aS;
+      // Their sides catch the light from above as they turn.
+      float destello = pw(0.5 + 0.5 * sin(sv * 4.0 - uTime * 0.9 + aO.x * 2.0), 10.0);
+      em *= 0.3 + 2.6 * destello;`,
+    uniforms: { uCentro: { value: new THREE.Vector3() }, uTu: { value: new THREE.Vector3() }, uGiro: { value: 0 } },
+    extra: { aU: [new Float32Array(aU), 1], aO: [new Float32Array(aO), 2], aS: [new Float32Array(aS), 1] },
+  });
+}
+
+// ---------------------------------------------------------------- the act
+
+export const acto1: Escena = {
+  id: 'acto1',
+  nombre: 'Apertura y acto I',
+  estilos: [{ key: '1', nombre: 'El acto', nota: 'Los dos puntos de Mente, la caída a la ciudad con lluvia, el cruce, el título; el círculo que se aleja, todo lo que sube, el cardumen y el mensaje.' }],
+  montar(stage): Instancia {
+    const root = stage.root;
+    const { camera } = stage;
+    stage.bloom.strength = 0.8;
+    stage.bloom.radius = 0.75;
+    stage.bloom.threshold = 0.12;
+    stage.finish.uniforms.uGrain.value = 0.03;
+    stage.finish.uniforms.uVignette.value = 0.7;
+
+    // The fall: three clouds that ride in front of the camera, each one opening out of a point.
+    const cosmos = new THREE.Group();
+    const etapas: Nube[] = [red(), galaxia(), tierra()];
+    const grupos = etapas.map((e) => {
+      const gr = new THREE.Group();
+      gr.add(e.points);
+      cosmos.add(gr);
+      return gr;
+    });
+    root.add(cosmos);
+
+    const mundo = marYCiudad({ lleno: 1, aro: 1, espejo: 1 });
+    root.add(mundo.points);
+    // Two rains: the one in the air, fast, and the one that goes on under the water, slow. Each
+    // falls at its own steady speed, so a frame depends only on where the journey is and the time.
+    const aire = nevar(26000, 2);
+    aire.u.uCol.value.setRGB(0.8, 0.86, 0.96);
+    aire.u.uI.value = 0;
+    const agua = nevar(26000, 2);
+    agua.u.uCol.value.setRGB(0.45, 0.66, 1.0);
+    agua.u.uI.value = 0;
+    root.add(aire.points, agua.points);
+
+    const peces = cardumen();
+    root.add(peces.points);
+
+    const bt = materiaBuilder(75);
+    bt.push(0, 0, 0, TU, 0.03, 1);
+    const tu = materia(bt.data());
+    tu.u.uFuente.value = 1;
+    root.add(tu.points);
+
+    // Where Mente ends: two points, a teal one and a white one. The white one leaves.
+    const b2 = materiaBuilder(76);
+    b2.push(-0.13, 0, 0, TU, 0.03, 1);
+    const yo = materia(b2.data());
+    yo.u.uFuente.value = 1;
+    const b3 = materiaBuilder(77);
+    b3.push(0, 0, 0, new THREE.Color(1, 1, 1), 0.03, 1);
+    const blanco = materia(b3.data());
+    blanco.u.uFuente.value = 1;
+    cosmos.add(yo.points, blanco.points);
+
+    // Every night everything that lives down here goes up to feed, and goes back down at dawn.
+    // You meet them on your way down: a snowfall the wrong way round.
+    const suben = nevar(26000, 0);
+    suben.u.uCol.value.setRGB(0.62, 0.84, 1.0);
+    suben.u.uI.value = 0;
+    suben.u.uRaya.value = 0.45;
+    root.add(suben.points);
+
+    const tl = new Timeline();
+    // z: the fall (0 the web, 1 the galaxy, 2 the Earth, 3 the city); y, th, fov: the camera over
+    // and under the water; m: the depth the clock shows; hud: the clock; raya: rain as strokes.
+    // dos, ida, red: the two points, the white one leaving, the web coming up; suben, sub: the
+    // ones that rise, and how far they have gone up; msg: the message, 0 → 1 written → 2 erased.
+    tl.set({ z: 0, y: 46, th: -0.95, fov: 40, m: 0, min: -20, hud: 0, aviso: 0, raya: 1, amb: 0, titulo: 0, peces: 0, giro: 0, tu: 0, msg: 0, fin: 0, dos: 0, ida: 0, red: 0, suben: 0, sub: 0 });
+    tl.label('dos').caption(4.4, 'Dos luces', 'La última vez que miraste, eran dos.');
+    tl.with(0.8, { aviso: 1 });
+    tl.to(1.6, { dos: 1 });
+    tl.to(2.8, { ida: 1, red: 1 });
+    tl.label('todo').caption(4.0, 'Todo lo que viste', 'Viste que el universo mide 10²⁶ metros.');
+    tl.with(0.8, { aviso: 0 });
+    tl.to(2.6, { z: 0.22 });
+    tl.to(1.4, { z: 0.5 });
+    tl.label('yo').caption(9.0, '¿Y yo?', '¿Y yo, qué soy en todo esto?');
+    tl.to(2.0, { z: 1.15 });
+    tl.to(2.2, { z: 2.1 });
+    tl.to(1.8, { z: 3.0, y: 40 });
+    tl.to(3.0, { y: 1.9, th: 0.02, fov: 46, hud: 1, amb: 0.3 });
+    tl.label('llueve').caption(4.0, 'Llueve', 'Llueve sobre la ciudad. Llueve sobre el mar.');
+    tl.to(1.6, { y: 1.3, min: -19 });
+    tl.to(2.4, { y: 0.3, th: -0.2 });
+    tl.label('cruce').caption(2.2, 'La superficie', 'La lluvia no se detiene en el agua.');
+    tl.to(0.9, { y: 0.0, th: -0.05 });
+    tl.to(1.3, { y: -1.1, th: 0.7, fov: 70, amb: 0.2, min: -18, m: 1 });
+    tl.label('titulo');
+    tl.with(0.8, { titulo: 1 });
+    tl.to(2.4, { y: -2.4, th: 1.2, fov: 96, raya: 0.6, m: 2.4 });
+    tl.with(0.9, { titulo: 0 });
+    tl.to(1.0, { y: -3.0, th: 1.26, fov: 100, m: 3 });
+    tl.label('arriba').caption(5.0, 'Lo que queda arriba', 'Desde abajo, todo lo de arriba cabe en un círculo.');
+    tl.to(5.0, { y: -8, th: 1.32, fov: 104, raya: 0.3, amb: 0.16, m: 14, min: -15 });
+    tl.label('aleja').caption(5.0, 'Se aleja', 'Cada metro, un poco más lejos.');
+    tl.to(5.0, { y: -20, th: 1.22, raya: 0, amb: 0.1, m: 45, min: -11, tu: 1 });
+    tl.label('sube').caption(8.0, 'Todo sube', 'Cada noche, todo lo que vive aquí abajo sube. Tú bajas.');
+    tl.to(3.0, { y: -23, th: 0.8, fov: 82, suben: 1, sub: 1.5, m: 60, min: -8 });
+    tl.to(5.0, { y: -27, th: 0.42, fov: 66, sub: 6, m: 85, min: -5 });
+    tl.label('cardumen').caption(10.0, 'El cardumen', 'Rodeado, y solo.');
+    tl.to(2.6, { y: -30, th: 0.16, fov: 58, peces: 1, giro: 0.5, m: 100, suben: 0.5, sub: 7.6 });
+    tl.to(7.4, { y: -34, th: 0.1, giro: 2.9, m: 140, min: -1, suben: 0.3, sub: 11 });
+    tl.label('mensaje').caption(7.0, 'El mensaje', 'Lo escribes. Lo borras.');
+    tl.to(1.8, { peces: 0, giro: 3.3, y: -36, m: 155, amb: 0.16, suben: 0.14, sub: 11.8 });
+    tl.with(4.0, { msg: 2 }, (t) => t);
+    tl.to(4.0, { y: -40, m: 185, min: 2, sub: 13.4 });
+    tl.to(1.2, { y: -41, m: 200, min: 4, suben: 0, sub: 13.8 });
+    tl.label('fin');
+    tl.to(1.2, { fin: 1, amb: 0.04 });
+
+    const dir = V();
+    const ZFIN = 3;
+
+    return {
+      tl,
+      luzEntrada: TU.clone(),
+      luzSalida: TU.clone(),
+      cuenta: (p) => ({ m: tl.get('m', p), min: tl.get('min', p), a: tl.get('hud', p) }),
+      rotulo(p): Rotulo | null {
+        const cp = tl.captionAt(p);
+        return cp ? { capitulo: p < tl.at('titulo') ? CAP0 : CAP1, name: cp.name, fact: cp.fact } : null;
+      },
+      marca: (p) => (1 - tl.get('titulo', p)) * tl.get('hud', p),
+      placa(g, f) {
+        const u = f.u;
+        const av = tl.get('aviso', f.p);
+        if (av > 0.01) {
+          // The note at the door (BRIEF § Cuidado, 6). Its place for now, until the cover exists.
+          g.save();
+          g.globalAlpha = av * 0.8;
+          g.textAlign = 'center';
+          g.font = FONT.mono(10.5 * u);
+          g.letterSpacing = `${1.4 * u}px`;
+          g.fillStyle = ink(0.8);
+          g.fillText('ESTA OBRA HABLA DE DEPRESIÓN Y SUICIDIO', f.W / 2, f.H - 60 * u);
+          g.restore();
+        }
+        const t = tl.get('titulo', f.p);
+        if (t > 0.01) {
+          g.save();
+          g.globalAlpha = t;
+          g.textAlign = 'center';
+          g.shadowColor = 'rgba(0,0,0,0.8)';
+          g.shadowBlur = 26 * u;
+          g.font = FONT.mono(11.5 * u);
+          g.letterSpacing = `${3.4 * u}px`;
+          g.fillStyle = ac();
+          g.fillText('HORIZONTES · 06', f.W / 2, f.H * 0.46 - 96 * u);
+          g.letterSpacing = '0px';
+          g.font = FONT.serif(150 * u);
+          g.fillStyle = ink();
+          g.fillText('Abismo', f.W / 2, f.H * 0.46 + 36 * u);
+          g.font = FONT.italic(30 * u);
+          g.fillStyle = ink(0.82);
+          g.fillText('¿Para qué seguir?', f.W / 2, f.H * 0.46 + 92 * u);
+          g.restore();
+        }
+        // The message: only its words, by your light. Written, erased, never sent.
+        pensamiento(g, u, f.W * 0.5, f.H * 0.4, '¿estás despierto?', tl.get('msg', f.p), 1, 28);
+      },
+      update(f: Frame) {
+        const p = f.p;
+        const y = tl.get('y', p);
+        const th = tl.get('th', p) + 0.01 * Math.sin(f.time * 0.2);
+        camera.near = 0.03;
+        camera.far = 400;
+        camera.fov = tl.get('fov', p);
+        camera.position.set(0.15 * Math.sin(f.time * 0.07), y, 0);
+        camera.up.set(0, Math.cos(th), Math.sin(th));
+        dir.set(0, Math.sin(th), -Math.cos(th));
+        camera.lookAt(camera.position.x + dir.x, y + dir.y, dir.z);
+        camera.updateMatrixWorld();
+
+        // The fall. Each stage is 1 when the journey is on it, a point before and gone after.
+        const z = tl.get('z', p);
+        cosmos.visible = z < ZFIN;
+        if (cosmos.visible) {
+          cosmos.position.copy(camera.position).addScaledVector(dir, 3.2);
+          cosmos.quaternion.copy(camera.quaternion);
+          for (const [k, e] of etapas.entries()) {
+            const t = z - k;
+            const s = Math.exp(4.3 * clamp(t, -1.2, 1.2));
+            grupos[k].scale.setScalar(s);
+            grupos[k].rotation.y = k === 0 ? f.time * 0.01 : 0;
+            enfocar(e, f.focal, f.dpr, f.time);
+            e.u.uEscalaMundo.value = s;
+            e.u.uMinPx.value = 1.5 * f.dpr;
+            e.u.uMaxPx.value = 7 * f.dpr;
+            e.u.uGain.value = (k === 0 ? tl.get('red', p) : smoothstep(-1.1, -0.8, t)) * (1 - smoothstep(0.5, 1.05, t)) * [0.9, 1.0, 1.1][k] * (1 + 2.5 * smoothstep(-0.3, -1.0, t));
+          }
+        }
+
+        if (cosmos.visible) {
+          const ida = tl.get('ida', p);
+          const dos = tl.get('dos', p) * (1 - smoothstep(0.2, 0.5, z));
+          for (const n of [yo, blanco]) {
+            enfocar(n, f.focal, f.dpr, f.time);
+            n.u.uMinPx.value = 5 * f.dpr;
+          }
+          yo.u.uGain.value = 2.6 * dos;
+          // The white one goes off into the web, and gets small.
+          blanco.points.position.set(0.13 + 1.5 * ida * ida, 0.5 * ida * ida, -9 * ida * ida);
+          blanco.u.uGain.value = 2.6 * dos * (1 - 0.92 * smoothstep(0.1, 1.0, ida));
+        }
+
+        // The city and the sea come up as the Earth opens.
+        const llega = smoothstep(2.45, 3.0, z);
+        const fin = tl.get('fin', p);
+        mundo.points.visible = llega > 0.001;
+        enfocar(mundo, f.focal, f.dpr, f.time);
+        mundo.u.uMinPx.value = 1.5 * f.dpr;
+        mundo.u.uMaxPx.value = 9 * f.dpr;
+        mundo.u.uGain.value = llega * (1 - fin);
+        (mundo.u.uCam.value as THREE.Vector3).copy(camera.position);
+
+        const amb = tl.get('amb', p);
+        const sobre = smoothstep(-0.1, 0.15, y);
+        for (const [n, vel, k] of [
+          [aire, 7, sobre],
+          [agua, 0.5, 1 - sobre],
+        ] as const) {
+          n.points.visible = amb * k > 0.002;
+          n.points.position.set(camera.position.x, y, 0);
+          n.u.uTime.value = f.time;
+          n.u.uFocal.value = f.focal;
+          n.u.uDpr.value = f.dpr;
+          // Under the water the flakes stay where they are while you go down past them.
+          n.u.uCae.value = f.time * vel + (n === agua ? 0.7 * y : 0);
+          n.u.uAmb.value = amb * k;
+        }
+        aire.u.uRaya.value = 1;
+        agua.u.uRaya.value = tl.get('raya', p);
+
+        // The ones that rise: their box goes with the camera, and they go up through it.
+        const su = tl.get('suben', p);
+        suben.points.visible = su > 0.002;
+        suben.points.position.set(camera.position.x, y, 0);
+        suben.u.uTime.value = -f.time * 4;
+        suben.u.uFocal.value = f.focal;
+        suben.u.uDpr.value = f.dpr;
+        suben.u.uCae.value = -tl.get('sub', p);
+        suben.u.uAmb.value = 0.42 * su * (1 - fin);
+
+        const pe = tl.get('peces', p);
+        peces.points.visible = pe > 0.001;
+        enfocar(peces, f.focal, f.dpr, f.time);
+        peces.u.uMinPx.value = 1.5 * f.dpr;
+        peces.u.uMaxPx.value = 4.5 * f.dpr;
+        peces.u.uGain.value = 1.0 * pe;
+        (peces.u.uCentro.value as THREE.Vector3).set(0, y + 0.05, -5.1);
+        (peces.u.uTu.value as THREE.Vector3).set(0, y - 0.32, -1.7);
+        peces.u.uGiro.value = tl.get('giro', p);
+
+        // You: a small light, a little ahead and below, outside the school.
+        // At the end it comes to the middle of the frame: it is the point the next act opens from.
+        tu.points.position.set(0, y - 0.32 + 0.02 * Math.sin(f.time * 0.4), -1.7).lerp(V(0, y + Math.sin(th) * 1.7, -Math.cos(th) * 1.7), smoothstep(0, 1, fin));
+        enfocar(tu, f.focal, f.dpr, f.time);
+        tu.u.uMinPx.value = 5 * f.dpr;
+        tu.u.uGain.value = 2.6 * tl.get('tu', p) * ease(1.0, 0.4, th) * (0.93 + 0.07 * Math.sin(f.time * 1.1));
+      },
+      dispose() {},
+    };
+  },
+};

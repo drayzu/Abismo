@@ -1,0 +1,259 @@
+import { Timeline } from './timeline';
+import { pantalla } from '../src/engine/pantalla';
+import type { Rotulo } from './placa';
+import { SEGURO } from './comun';
+import type { Escena, Frame, Instancia } from './tipos';
+
+/**
+ * Study · the drop that falls into the sea, and Snell's window (opening and act I).
+ *
+ * One screen shader, two worlds and no cut. The window of the room at night, with rain on the
+ * glass: every drop is a lens that carries the city, small and upside down. The camera goes into
+ * one drop until its circle is as large as Snell's window; then the circle *is* Snell's window:
+ * from under water the whole sky fits in a cone of 97°, and the city's lights are squeezed into its
+ * rim. Outside the circle the surface is a mirror (total internal reflection).
+ *
+ * The ways differ in how the surface is seen from below.
+ */
+
+const FRAG = /* glsl */ `
+  uniform float uLz, uMix, uOsc, uH, uOla, uPlata, uRayos, uNubes, uLuna;
+  ${SEGURO}
+
+  vec3 luzCiudad(float h) {
+    return h < 0.55 ? vec3(1.0, 0.6, 0.24) : h < 0.8 ? vec3(1.0, 0.86, 0.62) : h < 0.9 ? vec3(1.0, 0.22, 0.16) : vec3(0.5, 0.75, 1.0);
+  }
+
+  // The city as discs of light: esc cells per screen height, rad the disc (in cells), borde its softness.
+  vec3 ciudad(vec2 p, float esc, float rad, float borde) {
+    vec3 c = vec3(0.0);
+    vec2 g = p * esc;
+    vec2 id = floor(g);
+    for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+      vec2 cell = id + vec2(float(i), float(j));
+      vec2 h = h22(cell);
+      float on = step(0.42, h21(cell + 7.3)) * smoothstep(0.42, -0.18, cell.y / esc + h.y * 0.25);
+      float r = rad * (0.45 + 0.75 * h21(cell + 3.1));
+      float d = length(g - cell - h);
+      float disc = smoothstep(r, r * (1.0 - borde), d) * (0.65 + 0.55 * smoothstep(r * 0.55, r, d));
+      c += luzCiudad(h21(cell + 1.7)) * disc * on * (0.25 + 0.75 * h21(cell + 9.9));
+    }
+    return c;
+  }
+
+  // The city out of focus, behind the glass.
+  vec3 lejos(vec2 p) {
+    vec3 c = mix(vec3(0.03, 0.022, 0.03), vec3(0.006, 0.01, 0.026), smoothstep(-0.5, 0.45, p.y));
+    c += ciudad(p, 4.2, 0.62, 0.22) * 0.34;
+    c += ciudad(p + 3.7, 7.5, 0.55, 0.3) * 0.22;
+    return c;
+  }
+  // The same city in focus, as a drop sees it.
+  vec3 nitida(vec2 p) {
+    vec3 c = mix(vec3(0.05, 0.035, 0.04), vec3(0.008, 0.014, 0.04), smoothstep(-0.3, 0.4, p.y));
+    c += ciudad(p, 15.0, 0.16, 0.85) * 1.5;
+    c += ciudad(p * 1.3 + 5.1, 26.0, 0.2, 0.9) * 0.9;
+    return c;
+  }
+
+  // What a drop shows: the scene upside down, darker towards its edge, and a glint.
+  vec3 lente(vec2 q) {
+    float d = length(q);
+    vec3 c = nitida(-q * 0.5) * (0.45 + 1.0 * smoothstep(1.0, 0.3, d)) + lejos(-q * 0.4) * 0.35;
+    c += vec3(0.75, 0.82, 1.0) * smoothstep(0.16, 0.0, length(q - vec2(-0.42, 0.46))) * 0.6;
+    c += vec3(0.5, 0.6, 0.8) * smoothstep(0.82, 1.0, d) * smoothstep(1.02, 0.96, d) * 0.22;
+    return c;
+  }
+
+  vec3 vidrio(vec2 p, float zoom) {
+    vec3 c = lejos(p);
+    // A fine mist of droplets, and trails where a drop ran down.
+    c *= 0.86 + 0.14 * fbm(p * 26.0);
+    float col = floor(p.x * 9.0);
+    float hc = h11(col * 7.7 + 2.0);
+    float xc = (col + 0.3 + 0.4 * hc) / 9.0 + 0.004 * sin(p.y * 30.0 + hc * 40.0);
+    float y = fract(p.y * 0.42 + uTime * (0.012 + 0.03 * hc) + hc);
+    float cola = smoothstep(0.0, 0.03, y) * smoothstep(0.6, 0.05, y);
+    float ancho = 0.0045 * (0.4 + cola);
+    float rastro = smoothstep(ancho, ancho * 0.4, abs(p.x - xc)) * cola * step(0.35, hc);
+    c = mix(c, nitida(vec2(-(p.x - xc) * 30.0, -p.y * 0.4)) * 0.6 + lejos(p) * 0.55, rastro * 0.8);
+    // Still drops, two sizes.
+    for (int k = 0; k < 2; k++) {
+      float esc = k == 0 ? 4.6 : 11.0;
+      vec2 g = p * esc + float(k) * 13.7;
+      vec2 id = floor(g);
+      for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+        vec2 cell = id + vec2(float(i), float(j));
+        vec2 h = h22(cell + 11.0);
+        float r = 0.05 + 0.2 * pw(h21(cell + 5.5), 2.0);
+        vec2 q = (g - cell - 0.25 - 0.5 * h) / r;
+        q.y *= 0.86;
+        float m = smoothstep(1.0, 0.94, length(q)) * step(k == 0 ? 0.62 : 0.5, h21(cell + 2.2));
+        if (m > 0.0) c = mix(c, lente(q), m);
+      }
+    }
+    // The drop the camera goes into, at the centre of the zoom.
+    vec2 q = p / 0.03;
+    float d = length(q);
+    c *= 1.0 - uOsc * smoothstep(1.0, 1.6, d);
+    float m = smoothstep(1.0, 1.0 - 0.06 / zoom * 11.0 - 0.01, d);
+    c = mix(c, lente(q), m);
+    return c;
+  }
+
+  // The night sky and the city on the horizon, seen from the air side.
+  vec3 cielo(vec3 r) {
+    float alt = max(r.y, 0.0);
+    vec3 c = mix(vec3(0.13, 0.085, 0.06), vec3(0.012, 0.02, 0.05), smoothstep(0.0, 0.45, alt));
+    float n = fbm(r.xz / (alt + 0.3) * 1.3 + uTime * 0.008);
+    c += vec3(0.085, 0.08, 0.095) * smoothstep(0.38, 0.85, n) * uNubes;
+    vec3 L = normalize(vec3(0.42, 0.85, -0.3));
+    float m = dot(r, L);
+    c += vec3(0.86, 0.9, 1.0) * (smoothstep(0.9988, 0.9995, m) * 5.0 + pw(m, 300.0) * 0.5 + pw(m, 24.0) * 0.07) * uLuna;
+    float az = atan(r.z, r.x);
+    vec2 g = vec2(az * 20.0, alt * 26.0);
+    vec2 id = floor(g);
+    vec2 h = h22(id);
+    float d = length(fract(g) - 0.5 - (h - 0.5) * 0.5);
+    float on = step(0.3, h21(id + 4.0)) * smoothstep(0.2, 0.01, alt);
+    c += luzCiudad(h21(id + 1.7)) * smoothstep(0.22, 0.04, d) * on * 4.0;
+    return c;
+  }
+
+  vec3 noche(float arriba) {
+    return vec3(0.003, 0.011, 0.028) * (0.35 + 1.3 * smoothstep(-0.6, 1.0, arriba));
+  }
+
+  vec3 snell(vec3 d) {
+    vec3 c = noche(d.y);
+    if (d.y > 0.02) {
+      float t = uH / d.y;
+      vec2 x = d.xz * t;
+      vec2 gr = vec2(0.0);
+      float f = 0.9;
+      float a = 0.3;
+      for (int i = 0; i < 5; i++) {
+        float fi = float(i);
+        vec2 dir = vec2(cos(fi * 2.4 + 0.5), sin(fi * 2.4 + 0.5));
+        gr += dir * cos(dot(x, dir) * f + uTime * (0.5 + 0.23 * fi)) * a;
+        f *= 1.83;
+        a *= 0.72;
+      }
+      gr += (vec2(ruido(x * 2.1 + uTime * 0.25), ruido(x * 2.1 + 31.0 - uTime * 0.2)) - 0.5) * 0.35;
+      gr *= uOla * (0.6 + 0.4 * exp(-t * 0.08));
+      vec3 n = normalize(vec3(gr.x, -1.0, gr.y));
+      vec3 r = refract(d, n, 1.333);
+      vec3 s;
+      if (dot(r, r) < 0.5) {
+        // The mirror: the dark below, and what little light the waves catch.
+        vec3 rf = reflect(d, n);
+        s = noche(rf.y) * 1.6;
+        float brillo = pw(ruido(x * 1.1 + gr * 2.0 + uTime * 0.12), 3.0);
+        s += vec3(0.11, 0.15, 0.22) * brillo * uPlata;
+      } else {
+        float ct = clamp(dot(r, -n), 0.0, 1.0);
+        float F = 0.02 + 0.98 * pw(1.0 - ct, 5.0);
+        s = cielo(r) * (1.0 - F) + noche(-0.5) * F;
+      }
+      vec3 tr = exp(-vec3(0.2, 0.045, 0.02) * t * 0.35);
+      c = s * tr + c * (1.0 - tr.b);
+      c = mix(noche(d.y), c, smoothstep(0.02, 0.1, d.y));
+    }
+    // Shafts of moonlight coming down from the window.
+    float az = atan(d.z, d.x);
+    float ang = acos(clamp(d.y, -1.0, 1.0));
+    // Sampled round a circle, so there is no seam where the angle wraps.
+    vec2 ca = vec2(cos(az), sin(az));
+    float haz = ruido(ca * 2.6 + 9.0 + uTime * 0.05) * (0.5 + 0.5 * ruido(ca * 7.0 + 31.0 - uTime * 0.04));
+    haz = pw(haz * 1.9, 2.0) * smoothstep(1.9, 0.5, ang) * smoothstep(0.3, 1.0, ang);
+    c += vec3(0.12, 0.2, 0.3) * haz * uRayos * exp(-uH * 0.035);
+    return c;
+  }
+
+  void main() {
+    vec3 c = vec3(0.0);
+    float zoom = exp(uLz);
+    if (uMix < 1.0) {
+      vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0) / zoom;
+      c = vidrio(p, zoom);
+    }
+    if (uMix > 0.0) c = mix(c, snell(normalize(vDir)), uMix);
+    gl_FragColor = vec4(c, 1.0);
+  }
+`;
+
+const MANERAS = [
+  // ola, plata, rayos, nubes, luna
+  { ola: 0.5, plata: 1.0, rayos: 0.0, nubes: 1.0, luna: 1.0 },
+  { ola: 0.38, plata: 0.4, rayos: 0.75, nubes: 0.6, luna: 1.3 },
+  { ola: 0.07, plata: 0.0, rayos: 0.0, nubes: 0.3, luna: 0.55 },
+];
+
+export const gota: Escena = {
+  id: 'gota',
+  nombre: 'La gota y la ventana de Snell',
+  estilos: [
+    { key: '1', nombre: 'Techo de plata', nota: 'La superficie es un espejo que se mueve; el cielo y la ciudad tiemblan dentro del círculo.' },
+    { key: '2', nombre: 'Rayos de luna', nota: 'Del círculo bajan haces de luz. Más luna, menos espejo.' },
+    { key: '3', nombre: 'Círculo quieto', nota: 'El agua casi inmóvil: un círculo limpio, con la ciudad en el borde. Más abstracta.' },
+  ],
+  montar(stage, estilo): Instancia {
+    const { camera } = stage;
+    const M = MANERAS[estilo];
+    stage.bloom.strength = 0.6;
+    stage.bloom.radius = 0.6;
+    stage.bloom.threshold = 0.3;
+    stage.finish.uniforms.uGrain.value = 0.03;
+
+    const film = pantalla(FRAG, {
+      uLz: { value: 0 },
+      uMix: { value: 0 },
+      uOsc: { value: 0 },
+      uH: { value: 1.2 },
+      uOla: { value: M.ola },
+      uPlata: { value: M.plata },
+      uRayos: { value: M.rayos },
+      uNubes: { value: M.nubes },
+      uLuna: { value: M.luna },
+    });
+    stage.root.add(film.mesh);
+
+    const tl = new Timeline();
+    // lz: log of the zoom into the glass; osc: the glass goes dark round the drop; mix: glass → sea;
+    // h: depth of the camera (m); tilt: 0 looks straight up; fov.
+    tl.set({ lz: 0, osc: 0, mix: 0, h: 1.2, tilt: 0, fov: 118, min: -20 });
+    tl.label('ventana').caption(3.0, '¿Y yo?', '¿Y yo, qué soy en todo esto?');
+    tl.to(3.0, { lz: 0.5, min: -19 });
+    tl.label('gota').caption(4.0, 'La gota', 'Una gota en el vidrio lleva la ciudad entera, al revés.');
+    tl.to(2.6, { lz: 1.9, osc: 0.5 });
+    tl.to(1.4, { lz: Math.log(11), osc: 1 });
+    tl.label('cruce');
+    tl.to(1.6, { mix: 1, min: -18 });
+    tl.label('snell').caption(6.5, 'La ventana de Snell', 'Desde abajo, todo el cielo cabe en un círculo. Es la misma ventana.');
+    tl.to(2.5, { h: 4 });
+    tl.to(4.0, { h: 9, tilt: 0.36, fov: 108, min: -15 });
+    tl.wait(0.6);
+
+    return {
+      tl,
+      cuenta: (p) => ({ m: tl.get('mix', p) > 0.5 ? tl.get('h', p) : 0, min: tl.get('min', p) }),
+      rotulo(p): Rotulo | null {
+        const cp = tl.captionAt(p);
+        return cp ? { capitulo: p < tl.at('cruce') ? 'Apertura · Después de lo inmenso' : 'I · Soledad', name: cp.name, fact: cp.fact } : null;
+      },
+      update(f: Frame) {
+        const p = f.p;
+        const th = tl.get('tilt', p) + 0.012 * Math.sin(f.time * 0.21);
+        camera.fov = tl.get('fov', p);
+        camera.position.set(0, 0, 0);
+        camera.up.set(0, Math.sin(th), Math.cos(th));
+        camera.lookAt(0.012 * Math.sin(f.time * 0.17), Math.cos(th), -Math.sin(th));
+        film.u.uLz.value = tl.get('lz', p);
+        film.u.uOsc.value = tl.get('osc', p);
+        film.u.uMix.value = tl.get('mix', p);
+        film.u.uH.value = tl.get('h', p);
+      },
+      dispose() {},
+    };
+  },
+};

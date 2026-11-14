@@ -1,0 +1,241 @@
+import * as THREE from 'three';
+import { Timeline } from './timeline';
+import { pantalla } from '../src/engine/pantalla';
+import { enfocar, materia, materiaBuilder } from '../src/engine/materia';
+import { FONT, ink, type Rotulo } from './placa';
+import { BIO, CARMIN, ease, FONDO_M, SEGURO, TU, V } from './comun';
+import { marYCiudad } from './gota';
+import { nevar } from './nieve';
+import type { Escena, Frame, Instancia } from './tipos';
+
+/**
+ * Act VI · The way up (all the zones backwards, 1 100 → 1 atm, until dawn).
+ *
+ * Going up with someone: your light and the other one, with the thread between them, and the
+ * living lights passing down as you rise. Then the colours come back in reverse: it is act II's
+ * look up the column again, but now the column gets shorter, and the rays reach you one by one,
+ * blue first and red last. The surface comes down to you and you cross it: it is dawn, and it is
+ * not raining. The same city as in the opening, across the water, in the first light. The last
+ * sentence and, under it, where to find help (BRIEF § Cuidado, 5). It ends in two points.
+ *
+ * Guion v2: as the light comes back, everything that went up last night goes back down past you.
+ *
+ * It is not a happy ending: the sentence does not promise anything.
+ */
+
+const FRAG = /* glsl */ `
+  uniform float uM, uSup, uRayos, uMundo, uCielo;
+  ${SEGURO}
+  void main() {
+    vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
+    float fy = 1.0 - vUv.y;
+    // The water between the surface (at uSup, a fraction of the height; it may be above the frame)
+    // and you (in the middle): how deep each pixel is.
+    float prof = uM * clamp((fy - uSup) / max(0.5 - uSup, 1e-3), 0.0, 2.5);
+    vec3 agua = mix(vec3(0.008, 0.04, 0.15), vec3(0.05, 0.27, 0.34), exp(-uM / 40.0)) * (0.08 + 0.92 * exp(-uM / 260.0)) * (1.25 - fy) * 0.5;
+    agua += vec3(0.3, 0.16, 0.1) * exp(-uM / 12.0) * (1.0 - fy) * 0.18;
+    vec3 c = agua;
+    for (int i = 0; i < 5; i++) {
+      float fi = float(i);
+      vec3 col = i == 0 ? vec3(1.0, 0.06, 0.05) : i == 1 ? vec3(1.0, 0.38, 0.03) : i == 2 ? vec3(1.0, 0.85, 0.1) : i == 3 ? vec3(0.1, 0.9, 0.3) : vec3(0.12, 0.35, 1.0);
+      float k = i == 0 ? 0.34 : i == 1 ? 0.2 : i == 2 ? 0.085 : i == 3 ? 0.044 : 0.0095;
+      float x = p.x - (fi - 2.0) * 0.2 - (fy - 0.5) * 0.05;
+      float w = 0.026 + 0.012 * fbm(vec2(fi * 7.0, fy * 3.0 + uTime * 0.1));
+      float haz = exp(-x * x / (w * w)) + 0.3 * exp(-x * x / (w * w * 9.0));
+      haz *= 0.75 + 0.25 * fbm(vec2(x * 30.0 + fi * 3.0, uTime * 0.25));
+      // The first time the work has real colour: it is the Sun.
+      c += col * haz * exp(-k * prof) * uRayos * 0.3;
+    }
+    // Over the surface: the sky at dawn. In the 2D frame it is what is above the line; in the world
+    // (the city across the water) it follows the camera.
+    vec3 d = normalize(vDir);
+    float alto = mix(clamp((uSup - fy) * 1.6, 0.0, 1.0), smoothstep(-0.04, 0.55, d.y), uMundo);
+    vec3 cielo = mix(vec3(1.0, 0.56, 0.36), vec3(0.2, 0.27, 0.42), pw(alto, 0.6)) * 0.2 * uCielo;
+    cielo = mix(cielo, cielo * (0.25 + 0.75 * smoothstep(-0.08, 0.02, d.y)), uMundo);
+    float sobre = mix(smoothstep(uSup + 0.004, uSup - 0.004, fy), 1.0, uMundo);
+    c = mix(c, cielo, sobre);
+    float linea = exp(-(fy - uSup) * (fy - uSup) / 0.00002) * (0.5 + 0.5 * ruido(vec2(p.x * 60.0, uTime * 0.6)));
+    c += vec3(1.0, 0.8, 0.66) * linea * 0.35 * (1.0 - uMundo);
+    gl_FragColor = vec4(c, 1.0);
+  }
+`;
+
+export const acto6: Escena = {
+  id: 'acto6',
+  nombre: 'Acto VI',
+  estilos: [{ key: '1', nombre: 'El acto', nota: 'Subir con otra luz al lado, los colores que vuelven al revés, la superficie al amanecer, la ciudad con la primera luz y la última frase.' }],
+  montar(stage): Instancia {
+    const root = stage.root;
+    const { camera } = stage;
+    // A quiet film: the dawn here is the first light, not a blaze.
+    stage.bloom.strength = 0.42;
+    stage.bloom.radius = 0.6;
+    stage.bloom.threshold = 0.34;
+    stage.finish.uniforms.uGrain.value = 0.03;
+    stage.finish.uniforms.uVignette.value = 0.65;
+
+    const film = pantalla(FRAG, { uM: { value: FONDO_M }, uSup: { value: -0.3 }, uRayos: { value: 0 }, uMundo: { value: 0 }, uCielo: { value: 0 } });
+    root.add(film.mesh);
+
+    const mundo = marYCiudad({ lleno: 1, aro: 1, espejo: 1 });
+    mundo.u.uAlba.value = 1;
+    root.add(mundo.points);
+
+    // The living lights, passing down as you go up.
+    const vivas = nevar(26000, 0);
+    vivas.u.uCol.value.copy(BIO);
+    vivas.u.uI.value = 0;
+    const bajan = nevar(26000, 0);
+    bajan.u.uCol.value.setRGB(0.62, 0.84, 1.0);
+    bajan.u.uI.value = 0;
+    bajan.u.uRaya.value = 0.3;
+    root.add(bajan.points);
+    root.add(vivas.points);
+
+    const b = materiaBuilder(91);
+    b.push(-0.26, 0, 0, TU, 0.03, 1);
+    b.push(0.26, 0.04, 0, CARMIN, 0.03, 1.5);
+    const dos = materia(b.data());
+    dos.u.uFuente.value = 1;
+    const bh = materiaBuilder(92);
+    for (let i = 0; i < 140; i++) {
+      const t = i / 139;
+      bh.push(-0.26 + 0.52 * t, 0.04 * t + 0.03 * Math.sin(t * Math.PI), 0, TU.clone().lerp(CARMIN, t), 0.007, 0.8);
+    }
+    const hilo = materia(bh.data(), { move: /* glsl */ `p.y += 0.012 * sin(p.x * 14.0 + uTime * 0.7);` });
+    const par = new THREE.Group();
+    par.add(dos.points, hilo.points);
+    root.add(par);
+
+    const tl = new Timeline();
+    // m: the depth; sup: where the surface is in the frame (0.5 is where you are); rayos, cielo:
+    // the rays and the sky; mundo: the city across the water; pasa: how far the living lights have
+    // gone by; parY: the two lights' height in the frame; frase, ayuda: the end.
+    // bajan, baj: everything that went up last night, going back down past you.
+    tl.set({ m: FONDO_M, min: 260, sup: -0.3, rayos: 0, cielo: 0, mundo: 0, vivas: 0.5, pasa: 0, parY: 0, par: 1, frase: 0, ayuda: 0, hud: 1, alto: 1.6, bajan: 0, baj: 0 });
+    tl.label('sube').caption(8.0, 'Subir acompañado', 'Las luces suben contigo.');
+    tl.to(8.0, { m: 4000, min: 300, pasa: 7, vivas: 0.6 });
+    tl.label('cerca').caption(9.0, 'De cerca', 'El universo no te da un sentido. Tampoco te lo quita. Ese se hace de cerca.');
+    tl.to(9.0, { m: 1000, min: 335, pasa: 14, vivas: 0.35 });
+    tl.label('azul').caption(7.0, 'Vuelve el azul', 'Arriba amanece. Primero vuelve el azul.');
+    tl.to(7.0, { m: 300, min: 360, rayos: 1, pasa: 18, vivas: 0.12, bajan: 0.6, baj: 3 });
+    tl.label('bajan').caption(7.0, 'Todos bajan', 'Todo lo que subió anoche vuelve a bajar. Tú subes.');
+    tl.to(7.0, { m: 110, min: 374, bajan: 1, baj: 11, vivas: 0, pasa: 19 });
+    tl.label('colores').caption(9.0, 'Y lo demás', 'Después el verde. El amarillo. Al final, el rojo.');
+    tl.to(4.4, { m: 40, min: 384, sup: -0.3, cielo: 1, bajan: 0.3, baj: 15 });
+    tl.to(4.6, { m: 8, min: 392, sup: 0.16, bajan: 0, baj: 17 });
+    tl.label('superficie').caption(7.0, 'La superficie', 'Amanece. Ya no llueve.');
+    tl.to(2.2, { m: 0, sup: 0.5, min: 396 });
+    tl.to(2.2, { sup: 1.25, rayos: 0, parY: 0.34 });
+    tl.to(2.6, { mundo: 1, min: 400 });
+    tl.label('final').caption(4.0, 'La ciudad', 'La misma. Con la primera luz.');
+    // The camera keeps rising, very slowly, to the end: the day goes on coming.
+    tl.with(11.4, { alto: 2.5 });
+    tl.to(4.0, { min: 402, par: 0.8 });
+    tl.label('frase');
+    tl.to(1.8, { frase: 1, hud: 0 });
+    tl.to(1.6, { ayuda: 1 });
+    tl.wait(2.0);
+    // It ends as Mente did, in two points: yours, and the other's.
+    tl.to(2.0, { par: 1 });
+
+    const at = V();
+
+    return {
+      tl,
+      luzEntrada: TU.clone(),
+      cuenta: (p) => ({ m: tl.get('m', p), min: tl.get('min', p), a: tl.get('hud', p) }),
+      rotulo(p): Rotulo | null {
+        const cp = tl.captionAt(p);
+        return cp && p < tl.at('frase') ? { capitulo: 'VI · La subida', name: cp.name, fact: cp.fact } : null;
+      },
+      marca: (p) => tl.get('hud', p),
+      placa(g, f) {
+        const u = f.u;
+        const fr = tl.get('frase', f.p);
+        if (fr > 0.01) {
+          g.save();
+          g.globalAlpha = fr;
+          g.textAlign = 'center';
+          g.shadowColor = 'rgba(0,0,0,0.85)';
+          g.shadowBlur = 24 * u;
+          g.font = FONT.italic(54 * u);
+          g.fillStyle = ink();
+          // Provisional: the last sentence is Diego's to decide (BRIEF, open decision 5).
+          g.fillText('Todavía estás aquí.', f.W / 2, f.H * 0.42);
+          g.restore();
+        }
+        const ay = tl.get('ayuda', f.p);
+        if (ay > 0.01) {
+          g.save();
+          g.globalAlpha = ay * 0.85;
+          g.textAlign = 'center';
+          g.shadowColor = 'rgba(0,0,0,0.9)';
+          g.shadowBlur = 12 * u;
+          g.font = FONT.sans(16 * u);
+          g.fillStyle = ink(0.9);
+          g.fillText('Si lo estás pensando, habla hoy con alguien.', f.W / 2, f.H - 92 * u);
+          g.font = FONT.mono(11.5 * u);
+          g.letterSpacing = `${1.2 * u}px`;
+          g.fillStyle = ink(0.78);
+          g.fillText('FINDAHELPLINE.COM  ·  LÍNEAS DE AYUDA DE TU PAÍS, GRATIS', f.W / 2, f.H - 64 * u);
+          g.restore();
+        }
+      },
+      update(f: Frame) {
+        const p = f.p;
+        camera.near = 0.03;
+        camera.far = 400;
+        camera.fov = 44;
+        const ALTO = tl.get('alto', p);
+        camera.position.set(0.1 * Math.sin(f.time * 0.07), ALTO, 0);
+        camera.up.set(0, 1, 0);
+        camera.lookAt(camera.position.x, ALTO + 0.03, -1);
+        camera.updateMatrixWorld();
+
+        const mu = tl.get('mundo', p);
+        film.u.uM.value = tl.get('m', p);
+        film.u.uSup.value = tl.get('sup', p);
+        film.u.uRayos.value = tl.get('rayos', p);
+        film.u.uMundo.value = mu;
+        film.u.uCielo.value = tl.get('cielo', p);
+
+        mundo.points.visible = mu > 0.001;
+        enfocar(mundo, f.focal, f.dpr, f.time);
+        mundo.u.uMinPx.value = 1.5 * f.dpr;
+        mundo.u.uMaxPx.value = 9 * f.dpr;
+        mundo.u.uGain.value = 0.8 * mu;
+        (mundo.u.uCam.value as THREE.Vector3).copy(camera.position);
+
+        const vi = tl.get('vivas', p);
+        vivas.points.visible = vi > 0.002;
+        vivas.points.position.set(camera.position.x, ALTO, 0);
+        vivas.u.uTime.value = f.time;
+        vivas.u.uFocal.value = f.focal;
+        vivas.u.uDpr.value = f.dpr;
+        vivas.u.uCae.value = tl.get('pasa', p);
+        vivas.u.uAmb.value = vi;
+        const ba = tl.get('bajan', p);
+        bajan.points.visible = ba > 0.002;
+        bajan.points.position.set(camera.position.x, ALTO, 0);
+        bajan.u.uTime.value = f.time * 4;
+        bajan.u.uFocal.value = f.focal;
+        bajan.u.uDpr.value = f.dpr;
+        bajan.u.uCae.value = tl.get('baj', p);
+        bajan.u.uAmb.value = 0.22 * ba;
+
+        // The two lights: in the middle of the frame while you rise; lower, by the water, at the end.
+        at.set(0, ALTO + 0.03 * 2.6 - tl.get('parY', p) * 0.9, -2.6);
+        par.position.copy(at);
+        const k = tl.get('par', p);
+        enfocar(dos, f.focal, f.dpr, f.time);
+        dos.u.uMinPx.value = 5.5 * f.dpr;
+        dos.u.uGain.value = 2.8 * k * (0.93 + 0.07 * Math.sin(f.time * 1.0));
+        enfocar(hilo, f.focal, f.dpr, f.time);
+        hilo.u.uMinPx.value = 1.6 * f.dpr;
+        hilo.u.uGain.value = 1.1 * k * (1 - 0.5 * ease(0, 1, mu));
+      },
+      dispose() {},
+    };
+  },
+};

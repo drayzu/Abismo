@@ -1,0 +1,198 @@
+import { Timeline } from './timeline';
+import { pantalla } from '../src/engine/pantalla';
+import { enfocar, materia, materiaBuilder } from '../src/engine/materia';
+import { ink, nota, type Rotulo } from './placa';
+import { ease, SEGURO, TU, V } from './comun';
+import { nevar } from './nieve';
+import type { Escena, Frame, Instancia } from './tipos';
+
+/**
+ * Act II · Sadness (the twilight zone, 20 → 100 atm).
+ *
+ * It opens looking back up at all the water you already have above you: the column, from the
+ * surface (top of the frame) down to you (bottom), on a scale that gives the first metres more room. The light
+ * from above comes down it as one ray of each colour, and each dies at its depth: red in the first
+ * metres, then orange, yellow, green. Only blue reaches you. This is the «Los rayos» way Diego
+ * chose, and it takes the place of the things that lost their colour («lo que antes te gustaba»):
+ * what goes out one by one is the colours themselves.
+ *
+ * Then the snow begins, the descent gets slower for the same scroll (the weight), and at the end
+ * the blue goes too. What is left is your light.
+ */
+
+/** Where each colour is down to a twentieth, in metres (clear ocean water; to verify for the sheet). */
+const MUERE: [string, number, number][] = [
+  ['rojo', 9, 0.34],
+  ['naranja', 15, 0.2],
+  ['amarillo', 35, 0.085],
+  ['verde', 68, 0.044],
+  ['azul', 315, 0.0095],
+];
+/** The column in the frame: the surface at TOP and you at BOT (fractions of the height), 230 m in all. */
+const TOP = 0.11;
+const BOT = 0.84;
+const HONDO = 230;
+
+const FRAG = /* glsl */ `
+  uniform float uFrente, uRayos, uAzul, uTop;
+  ${SEGURO}
+  void main() {
+    vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
+    float fy = 1.0 - vUv.y;
+    float q = (fy - uTop) / (${BOT} - uTop);
+    float prof = ${HONDO.toFixed(1)} * pw(q, 2.857) * step(0.0, q);
+    // The water: the blue that is left, a little more of it above.
+    vec3 c = vec3(0.004, 0.02, 0.07) * uAzul * (0.35 + 0.9 * (1.0 - fy));
+    // The light has come down as far as the front.
+    float hasta = smoothstep(uFrente + 0.04, uFrente - 0.04, q) * smoothstep(-0.16, -0.02, q);
+    for (int i = 0; i < 5; i++) {
+      float fi = float(i);
+      vec3 col = i == 0 ? vec3(1.0, 0.06, 0.05) : i == 1 ? vec3(1.0, 0.38, 0.03) : i == 2 ? vec3(1.0, 0.85, 0.1) : i == 3 ? vec3(0.1, 0.9, 0.3) : vec3(0.12, 0.35, 1.0);
+      float k = i == 0 ? 0.34 : i == 1 ? 0.2 : i == 2 ? 0.085 : i == 3 ? 0.044 : 0.0095;
+      float x = p.x - (fi - 2.0) * 0.2 - (q - 0.5) * 0.05;
+      float w = 0.026 + 0.012 * fbm(vec2(fi * 7.0, fy * 3.0 + uTime * 0.1));
+      float haz = exp(-x * x / (w * w)) + 0.3 * exp(-x * x / (w * w * 9.0));
+      haz *= 0.75 + 0.25 * fbm(vec2(x * 30.0 + fi * 3.0, uTime * 0.25));
+      // It is night: this is the city's light, not the Sun's. Faint, and a little washed out.
+      col = mix(col, vec3(dot(col, vec3(0.3, 0.5, 0.2))) * vec3(1.0, 0.82, 0.62), 0.4);
+      c += col * haz * exp(-k * prof) * hasta * uRayos * 0.2;
+    }
+    // The surface: a thin line of glints.
+    float sup = exp(-q * q / 0.00006) * (0.5 + 0.5 * ruido(vec2(p.x * 60.0, uTime * 0.6)));
+    c += vec3(0.5, 0.62, 0.85) * sup * 0.35 * uRayos;
+    gl_FragColor = vec4(c, 1.0);
+  }
+`;
+
+export const acto2: Escena = {
+  id: 'acto2',
+  nombre: 'Acto II',
+  estilos: [{ key: '1', nombre: 'El acto', nota: 'Los rayos que mueren uno por uno, la nieve que empieza, el peso, y el azul que también se va.' }],
+  montar(stage): Instancia {
+    const root = stage.root;
+    const { camera } = stage;
+    stage.bloom.strength = 0.7;
+    stage.bloom.radius = 0.7;
+    stage.bloom.threshold = 0.14;
+    stage.finish.uniforms.uGrain.value = 0.03;
+    stage.finish.uniforms.uVignette.value = 0.7;
+
+    const film = pantalla(FRAG, { uFrente: { value: 0 }, uRayos: { value: 0 }, uAzul: { value: 0 }, uTop: { value: TOP } });
+    root.add(film.mesh);
+
+    const snow = nevar(26000, 0);
+    root.add(snow.points);
+    // The last of the ones that go up every night.
+    const suben = nevar(26000, 0);
+    suben.u.uCol.value.setRGB(0.62, 0.84, 1.0);
+    suben.u.uI.value = 0;
+    suben.u.uRaya.value = 0.3;
+    root.add(suben.points);
+
+    const TU_EN = V(0, 0, -2.6);
+    const b = materiaBuilder(81);
+    b.push(0, 0, 0, TU, 0.03, 1);
+    const tu = materia(b.data());
+    tu.u.uFuente.value = 1;
+    root.add(tu.points);
+
+    // Where the bottom of the column is, at your distance (the lens is 40°).
+    const ABAJO = (0.5 - BOT) * 2 * Math.tan((20 * Math.PI) / 180) * 2.6;
+
+    const tl = new Timeline();
+    // frente: how far down the light has come (0 surface, 1 you); rayos, azul: the rays and the blue
+    // of the water; tuY: your light's height in the frame (0 centre, 1 the bottom of the column);
+    // nieve: the snow; cae: how far it has fallen; m, min: the clock.
+    // top: where the surface is in the frame; it goes up and out as the camera follows the light down.
+    // alc: how far your light reaches (it starts to shrink here); suben, sub: the last ones going up.
+    tl.set({ top: TOP, frente: -0.2, rayos: 0, azul: 0, tuY: 0, luz: 1, alc: 1.5, nieve: 0, cae: 0, suben: 0, sub: 0, m: 200, min: 4, notas: 0 });
+    tl.label('arriba');
+    tl.to(1.6, { tuY: 1, rayos: 1, azul: 0.5, frente: 0.02, notas: 1 });
+    tl.label('rojo').caption(5.6, 'El rojo se va primero', 'De la luz de la ciudad, el agua se lleva primero el rojo.');
+    tl.to(5.6, { frente: 0.3, m: 204, min: 8 });
+    tl.label('demas').caption(5.6, 'Después, lo demás', 'Después el naranja. El amarillo. El verde.');
+    tl.to(5.6, { frente: 0.72, m: 209, min: 13, top: -0.12 });
+    tl.label('llega').caption(5.0, 'Lo que llega', 'Hasta ti solo llega el azul. Y poco.');
+    tl.to(5.0, { frente: 1.2, m: 215, min: 17, top: -0.6 });
+    tl.label('nieve').caption(7.0, 'La nieve', 'Empieza a caer. No va a parar.');
+    tl.to(2.4, { rayos: 0, notas: 0, tuY: 0, nieve: 1, m: 300, cae: 0.8 });
+    tl.to(4.6, { m: 460, cae: 2.6, azul: 0.36, min: 32 });
+    tl.label('ultimos').caption(6.0, 'Los últimos', 'Los últimos que suben pasan a tu lado. No se detienen.');
+    tl.to(2.0, { suben: 1, sub: 1.2, m: 500 });
+    tl.to(4.0, { suben: 0, sub: 5.5, m: 540, cae: 3.6, min: 40 });
+    tl.label('peso').caption(8.0, 'El peso', 'Hasta lo más pequeño cuesta. Tu luz alcanza menos.');
+    // The same scroll, and less and less way made.
+    tl.to(2.6, { m: 575, cae: 4.2, alc: 1.3 });
+    tl.to(2.6, { m: 595, cae: 4.6, alc: 1.15 });
+    tl.to(2.8, { m: 606, cae: 4.85, azul: 0.22, min: 52, alc: 1.05 });
+    tl.label('azul').caption(7.0, 'Lo último', 'Al final se va también el azul.');
+    tl.to(5.6, { m: 960, cae: 7.0, azul: 0, min: 73, luz: 0.85, alc: 1.0 });
+    tl.to(1.4, { m: 1000, cae: 7.4, min: 75 });
+    tl.wait(0.9);
+
+    return {
+      tl,
+      luzEntrada: TU.clone(),
+      luzSalida: TU.clone(),
+      cuenta: (p) => ({ m: tl.get('m', p), min: tl.get('min', p) }),
+      rotulo(p): Rotulo | null {
+        const cp = tl.captionAt(p);
+        return cp ? { capitulo: 'II · Tristeza', name: cp.name, fact: cp.fact } : null;
+      },
+      placa(g, f) {
+        const a = tl.get('notas', f.p);
+        if (a < 0.02) return;
+        const frente = tl.get('frente', f.p);
+        const top = tl.get('top', f.p);
+        const y = (q: number) => (top + q * (BOT - top)) * f.H;
+        nota(g, f.u, f.W / 2 - 0.52 * f.H, y(0), 'la superficie', -30, 0, a * 0.7, ink(0.9));
+        nota(g, f.u, f.W / 2 - 0.52 * f.H, y(1), 'tú · 200 m', -30, 0, a * 0.7 * ease(0.2, 0.8, tl.get('tuY', f.p)), ink(0.9));
+        MUERE.forEach(([nombre, prof], i) => {
+          const q = Math.pow(prof / HONDO, 0.35);
+          if (q > 1) return;
+          const x = f.W / 2 + ((i - 2) * 0.2 + (q - 0.5) * 0.05) * f.H;
+          nota(g, f.u, x, y(q), `${nombre} · ${prof} m`, 30, 0, a * 0.85 * ease(q, q + 0.08, frente), ink(0.9));
+        });
+      },
+      update(f: Frame) {
+        const p = f.p;
+        camera.near = 0.02;
+        camera.far = 100;
+        camera.fov = 40;
+        camera.position.set(0, 0, 0);
+        camera.up.set(0, 1, 0);
+        camera.lookAt(0, 0, -1);
+        film.u.uFrente.value = tl.get('frente', p);
+        film.u.uTop.value = tl.get('top', p);
+        film.u.uRayos.value = tl.get('rayos', p);
+        film.u.uAzul.value = tl.get('azul', p);
+
+        const luz = tl.get('luz', p) * (0.93 + 0.07 * Math.sin(f.time * 1.1));
+        TU_EN.y = ABAJO * tl.get('tuY', p);
+        tu.points.position.copy(TU_EN);
+        enfocar(tu, f.focal, f.dpr, f.time);
+        tu.u.uMinPx.value = 5 * f.dpr;
+        tu.u.uGain.value = 2.6 * luz;
+
+        snow.points.visible = tl.get('nieve', p) > 0.001;
+        snow.u.uTime.value = f.time;
+        snow.u.uFocal.value = f.focal;
+        snow.u.uDpr.value = f.dpr;
+        snow.u.uLuz.value.copy(TU_EN);
+        snow.u.uI.value = luz * tl.get('nieve', p);
+        snow.u.uCae.value = tl.get('cae', p);
+        snow.u.uAlc.value = tl.get('alc', p);
+        const su = tl.get('suben', p);
+        suben.points.visible = su > 0.002;
+        suben.u.uTime.value = -f.time * 4;
+        suben.u.uFocal.value = f.focal;
+        suben.u.uDpr.value = f.dpr;
+        suben.u.uCae.value = -tl.get('sub', p);
+        suben.u.uAmb.value = 0.2 * su;
+        // A little of the blue from above still falls on the snow, while there is any.
+        snow.u.uAmb.value = 0.12 * tl.get('azul', p) * tl.get('nieve', p);
+      },
+      dispose() {},
+    };
+  },
+};
