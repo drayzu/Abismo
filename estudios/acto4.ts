@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Timeline } from './timeline';
 import { pantalla } from '../src/engine/pantalla';
 import { enfocar, materia, materiaBuilder } from '../src/engine/materia';
-import { clamp, gauss, rng } from '../src/engine/math';
+import { clamp, gauss, rng, smoothstep } from '../src/engine/math';
 import { pensamiento, type Rotulo } from './placa';
 import { ease, FONDO_M, TU, V } from './comun';
 import { nevar } from './nieve';
@@ -187,6 +187,7 @@ export const acto4: Escena = {
     tl.to(4.0, { y: 30, yaw: 0.36, pitch: -0.4, m: 8200, min: 238, alc: 0.36 });
     // The floor comes up out of the dark, and you stop just over it.
     // The floor does not arrive all at once: it comes up out of the dark, and you settle on it.
+    tl.label('asoma');
     tl.to(4.0, { y: 13, llega: 0.55, yaw: 0.14, pitch: -0.3, m: 10300, min: 247, luz: 0.6, alc: 0.33, raya: 0.6 });
     tl.to(4.0, { y: ALTO, llega: 1, yaw: 0, pitch: -0.2, fov: 44, m: FONDO_M, min: 252, luz: 0.55, alc: 0.3, raya: 0.35 });
     tl.label('silencio').caption(7.0, 'El silencio', 'Aquí no se oye nada. El reloj se detiene.');
@@ -226,6 +227,12 @@ export const acto4: Escena = {
       luzSalida: TU.clone(),
       // It leaves the act as it is at the end: almost out.
       puente: 0.85,
+      // The landing is not rushed: while the floor comes up and you settle on it, scrolling goes at
+      // most a little faster than autoplay (it eases into the limit and out of it).
+      freno(p) {
+        const w = smoothstep(tl.at('asoma') - 2, tl.at('asoma'), p) * (1 - smoothstep(tl.at('silencio') + 0.5, tl.at('silencio') + 2.5, p));
+        return 0.8 + (1 - w) * 12;
+      },
       cuenta: (p) => ({ m: tl.get('m', p), min: tl.get('min', p), quieto: tl.get('quieto', p) }),
       rotulo(p): Rotulo | null {
         const cp = tl.captionAt(p);

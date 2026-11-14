@@ -185,6 +185,13 @@ function enTramo(P: number) {
 
 // ---------------------------------------------------------------- scroll and autoplay
 
+/** How fast the journey may go at beat P (beats per second), as the acts on there ask. */
+function freno(P: number) {
+  let lim = Infinity;
+  for (const t of tramos) if (t.inst.freno && P >= t.inicio && P <= t.inicio + t.largo) lim = Math.min(lim, t.inst.freno(P - t.inicio));
+  return lim;
+}
+
 let P = clamp(Number(params.get('p') ?? 0), 0, TOTAL);
 let target = P;
 let autoplay = false;
@@ -391,7 +398,13 @@ function frame(now: number) {
     target = next;
     if (next >= TOTAL) autoplay = false;
   }
+  const antes = P;
   P = frozen ?? damp(P, target, 4.2, dt);
+  // A moment that must not be rushed holds the scroll to its pace (not on a long jump).
+  if (frozen === null && Math.abs(target - antes) < 14) {
+    const lim = freno(antes);
+    P = antes + clamp(P - antes, -lim * dt, lim * dt);
+  }
   if (porCalentar.length) {
     for (let n = 0; n < 3 && porCalentar.length; n++) step(now, dt, porCalentar.shift()!);
     if (!porCalentar.length) calentarListo();
