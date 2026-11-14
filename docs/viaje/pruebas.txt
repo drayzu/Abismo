@@ -1,0 +1,10 @@
+viaje: 327.8 beats · acto1 63.2 · acto2 46.7 · nieve 53.05 · fondo 44 · luces 62.4 · acto6 58.4
+1 · consola: 0 errores en 2624 cuadros (ida y vuelta)
+2 · negro: ningún cuadro
+2 · quieto: 200.75–208, 211.5–213.5 (a propósito, en el fondo: 173–175.5, 175.75–193.25, 195.75–198.5)
+  FALLA · tramos quietos: 200.75–208, 211.5–213.5
+3 · saltar = llegar: 55 saltos, diferencia máxima 0.00 %
+5 · ritmo: el cuadro más caro tarda 3.9 ms (beat 319); media 2.4 ms
+4 · scroll: 3 saltos de scroll y 1 de ?p
+
+1 FALLAS
