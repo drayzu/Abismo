@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Timeline } from './timeline';
+import { EASE, Timeline } from './timeline';
 import { pantalla } from '../src/engine/pantalla';
 import { enfocar, materia, materiaBuilder } from '../src/engine/materia';
 import { gauss } from '../src/engine/math';
@@ -228,8 +228,9 @@ export const acto2: Escena = {
     tl.label('azul').caption(7.0, 'Lo último', 'Al final se va también el azul.');
     tl.to(1.6, { pitch: 1.05, fov: 66, y: -84, m: 650 });
     tl.to(4.0, { y: -126, m: 960, corte: ARRIBA + 12, azul: 0, rayos: 0, min: 73, luz: 0.85, alc: 1.0, yaw: 3.0 });
-    tl.to(1.4, { y: -HONDO, m: 1000, min: 75, pitch: -0.1, fov: 46 });
-    tl.wait(0.9);
+    tl.to(1.4, { y: -HONDO, m: 985, min: 74.5, pitch: -0.1, fov: 46 });
+    // No stop at the end: you keep sinking at the same pace while act III comes up over this one.
+    tl.to(0.9, { y: -HONDO - 6, m: 1000, min: 75 }, EASE.linear);
 
     const dir = V();
     const tuEn = V();

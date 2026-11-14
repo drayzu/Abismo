@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Timeline } from './timeline';
+import { EASE, Timeline } from './timeline';
 import { pantalla } from '../src/engine/pantalla';
 import { enfocar, materia, materiaBuilder } from '../src/engine/materia';
 import { clamp, gauss, rng, smoothstep } from '../src/engine/math';
@@ -334,7 +334,7 @@ export const acto3: Escena = {
     // metres from it); pitch, yaw, fov: where the camera looks; luz, alc: your light and its reach;
     // raya: flakes as strokes; onda1, onda2: each call crossing (0 → 1); pasa: the whale going up
     // past you (0 → 1); clic: its click (0 → 1); m, min: the clock (the hour slows down).
-    tl.set({ y: 0, roce: 0, pitch: -0.1, yaw: 0, fov: 46, luz: viaje ? 0.85 : 0, alc: 1, raya: 0, onda1: 0, onda2: 0, pasa: 0, clic: 0, m: 1000, min: 75 });
+    tl.set({ y: 1.5, roce: 0, pitch: -0.1, yaw: 0, fov: 46, luz: viaje ? 0.85 : 0, alc: 1, raya: 0, onda1: 0, onda2: 0, pasa: 0, clic: 0, m: 1000, min: 75 });
     const dichos: [number, number, number][] = [];
     const pensar = (cuales: number[], dur: number, pausa: number) => {
       for (const k of cuales) {
@@ -344,7 +344,9 @@ export const acto3: Escena = {
       }
     };
     tl.label('noche').caption(7.0, 'Medianoche', 'Aquí ya no llega nada de arriba. Lo único que ilumina es tu luz.');
-    tl.to(2.4, { luz: 1, y: -3, m: 1080, min: 96, pitch: -0.26 });
+    // Already falling when it opens (act II hands over in motion): the first stretch is at a steady pace.
+    tl.with(2.4, { y: -3 }, EASE.linear);
+    tl.to(2.4, { luz: 1, m: 1080, min: 96, pitch: -0.26 });
     // The wall comes out of the dark, and its ledges start going up past you.
     tl.to(4.6, { y: -13, roce: 1, yaw: 0.42, pitch: -0.3, raya: 0.16, m: 1300, min: 140 });
     tl.label('tres').caption(13.0, 'Lo que piensas a las tres', '');
