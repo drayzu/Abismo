@@ -18,6 +18,7 @@ import { acto3 } from '../estudios/acto3';
 import { acto4 } from '../estudios/acto4';
 import { acto5 } from '../estudios/acto5';
 import { acto6 } from '../estudios/acto6';
+import { crearMarco } from './marco/marco';
 
 /**
  * Abismo: the journey. One scroll through the acts, in order. Each act builds into its own group and
@@ -204,12 +205,26 @@ if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 scrollTo(0, P * PX_PER_BEAT);
 addEventListener('scroll', () => (target = clamp(scrollY / PX_PER_BEAT, 0, TOTAL)));
 addEventListener('wheel', () => (autoplay = false), { passive: true });
-addEventListener('touchstart', () => (autoplay = false), { passive: true });
-addEventListener('keydown', (ev) => {
-  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
-  if (ev.key.toLowerCase() === 'a') autoplay = !autoplay;
-  if (ev.key.toLowerCase() === 'i') laminaAbierta = !laminaAbierta;
+// A tap on the frame's buttons is not a scroll (or tapping ▷ could never pause).
+addEventListener('touchstart', (ev) => !(ev.target as Element | null)?.closest?.('.marco-barra, .marco-fin, .marco-mapa') && (autoplay = false), { passive: true });
+// The series' frame: its buttons and keys (A, I; the sound and English come later).
+const marco = crearMarco({
+  obra: 'abismo',
+  acciones: {
+    play: () => {
+      if (!autoplay && target >= TOTAL - 0.05) {
+        scrollTo(0, 0);
+        target = 0;
+      }
+      autoplay = !autoplay;
+    },
+    lamina: () => (laminaAbierta = !laminaAbierta),
+  },
 });
+/** The brand's light at this frame (each act says when it shows), for the frame's brand. */
+let marcaK = 0;
+/** How far the closing card is in (the last act says when: after its last sentence). */
+let finK = 0;
 const mouse = new THREE.Vector2();
 const mouseTarget = new THREE.Vector2();
 addEventListener('pointermove', (ev) => mouseTarget.set((ev.clientX / innerWidth) * 2 - 1, -((ev.clientY / innerHeight) * 2 - 1)));
@@ -350,25 +365,17 @@ function step(now: number, dt: number, at: number) {
   g.globalAlpha = k;
   inst.placa?.(g, f);
   g.restore();
-  // The brand, top left (it stays through the bridges).
-  const m = inst.marca?.(p) ?? 1;
-  if (m > 0.01) {
-    g.save();
-    g.globalAlpha = m;
-    g.textBaseline = 'alphabetic';
-    g.shadowColor = 'rgba(0,0,0,0.8)';
-    g.shadowBlur = 10 * u;
-    g.font = FONT.serif(27 * u);
-    g.fillStyle = ink();
-    g.fillText('Abismo', 40 * u, 54 * u);
-    g.restore();
-  }
+  // The brand, top left, is the frame's (it stays through the bridges).
+  marcaK = inst.marca?.(p) ?? 1;
+  finK = inst.fin?.(p) ?? 0;
+  // At the end the closing card is left alone; at rest the ladder steps back with the buttons.
   const c = inst.cuenta(p);
+  const kf = 1 - marco.final;
   g.save();
   g.globalAlpha = k;
-  cuenta(g, u, H, c, inst.rotulo(p));
+  cuenta(g, u, H, c && { ...c, a: (c.a ?? 1) * kf }, inst.rotulo(p), kf);
   g.restore();
-  if (c && inst.escalera !== false) escalera(g, u, W, H, c.m, (c.a ?? 1) * k);
+  if (c && inst.escalera !== false) escalera(g, u, W, H, c.m, (c.a ?? 1) * k * kf * (1 - marco.reposo));
   laminaK = damp(laminaK, laminaAbierta ? 1 : 0, 9, dt);
   lamina(g, u, W, H, LAMINAS[t.escena.id] ?? SIN_LAMINA, laminaK);
   // With ?beat: where we are, to talk about a moment by its number.
@@ -410,6 +417,7 @@ function frame(now: number) {
     if (!porCalentar.length) calentarListo();
   }
   step(now, dt, P);
+  marco.update({ p: P / TOTAL, playing: autoplay, cromo: marcaK, inicio: 1 - smooth(clamp((P - 0.05) / 0.55, 0, 1)), fin: finK });
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

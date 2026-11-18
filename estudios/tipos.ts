@@ -44,6 +44,8 @@ export interface Instancia {
   rotulo(p: number): Rotulo | null;
   /** Journey: how much of the brand at top left shows (the opening hides it under its title). */
   marca?(p: number): number;
+  /** Journey: how far the series' closing card is in (0 … 1; only the last act has one). */
+  fin?(p: number): number;
   /**
    * Journey: how fast scrolling may go through beat p of this act (beats per second; none: no limit).
    * A moment that must not be rushed (the landing on the floor) slows the scroll down to its pace.

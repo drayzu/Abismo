@@ -153,6 +153,10 @@ export interface Cuenta {
 }
 
 /** The pressure at bottom left, with the moment's chapter, name and sentence above it. */
+/** A narrow screen (a phone upright): the scale hugs the right edge without its labels, and the
+ * sentence keeps clear of it. */
+export const angosto = (W: number, u: number) => W / u < 900;
+
 export function cuenta(g: CanvasRenderingContext2D, u: number, H: number, c: Cuenta | null, cap: Rotulo | null, capAlpha = 1) {
   const x = 44 * u;
   g.save();
@@ -173,7 +177,7 @@ export function cuenta(g: CanvasRenderingContext2D, u: number, H: number, c: Cue
     g.fillText(cap.name, x, H - 226 * u);
     g.font = FONT.sans(14.5 * u);
     g.fillStyle = ink(0.66);
-    wrap(g, cap.fact, 430 * u).forEach((line, i) => g.fillText(line, x, H - 198 * u + i * 21 * u));
+    wrap(g, cap.fact, angosto(g.canvas.width, u) ? g.canvas.width - x - 44 * u : 430 * u).forEach((line, i) => g.fillText(line, x, H - 198 * u + i * 21 * u));
     g.globalAlpha = 1;
   }
   if (c && (c.a ?? 1) > 0.01) {
@@ -204,7 +208,8 @@ const col = (m: number) => Math.sqrt(clamp(m, 0, FONDO_M) / FONDO_M);
 /** The water column at the right edge: the five zones, and your mark going down it. */
 export function escalera(g: CanvasRenderingContext2D, u: number, W: number, H: number, m: number, alpha = 1) {
   if (alpha <= 0.01) return;
-  const x = W - 150 * u;
+  const chico = angosto(W, u);
+  const x = chico ? W - 20 * u : W - 150 * u;
   const y0 = 96 * u;
   const y1 = H - 76 * u;
   const yOf = (v: number) => y0 + col(v) * (y1 - y0);
@@ -235,6 +240,7 @@ export function escalera(g: CanvasRenderingContext2D, u: number, W: number, H: n
     g.moveTo(x - 7 * u, yb);
     g.lineTo(x, yb);
     g.stroke();
+    if (chico) continue;
     g.textAlign = 'left';
     g.fillStyle = ink(on ? 0.92 : 0.32);
     g.fillText(z[0].toUpperCase(), x + 14 * u, (ya + yb) / 2);

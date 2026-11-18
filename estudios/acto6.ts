@@ -478,6 +478,7 @@ export const acto6: Escena = {
         return cp && p < tl.at('frase') ? { capitulo: 'VI · La subida', name: cp.name, fact: cp.fact } : null;
       },
       marca: (p) => tl.get('hud', p),
+      fin: (p) => tl.get('ayuda', p),
       placa(g, f) {
         const u = f.u;
         const fr = tl.get('frase', f.p);
@@ -493,22 +494,7 @@ export const acto6: Escena = {
           g.fillText('Todavía estás aquí.', f.W / 2, f.H * 0.42);
           g.restore();
         }
-        const ay = tl.get('ayuda', f.p);
-        if (ay > 0.01) {
-          g.save();
-          g.globalAlpha = ay * 0.85;
-          g.textAlign = 'center';
-          g.shadowColor = 'rgba(0,0,0,0.9)';
-          g.shadowBlur = 12 * u;
-          g.font = FONT.sans(16 * u);
-          g.fillStyle = ink(0.9);
-          g.fillText('Si lo estás pensando, habla hoy con alguien.', f.W / 2, f.H - 92 * u);
-          g.font = FONT.mono(11.5 * u);
-          g.letterSpacing = `${1.2 * u}px`;
-          g.fillStyle = ink(0.78);
-          g.fillText('FINDAHELPLINE.COM  ·  LÍNEAS DE AYUDA DE TU PAÍS, GRATIS', f.W / 2, f.H - 64 * u);
-          g.restore();
-        }
+        // The help line is the series' closing card (the frame's, in the page: its link can be followed).
       },
       update(f: Frame) {
         const p = f.p;
