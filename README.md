@@ -3,11 +3,27 @@
 </p>
 
 <p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="media/above-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="media/above-dark.webp"><source type="image/avif" srcset="media/above-light.avif"><img src="media/above-light.webp" width="100%" alt="What is left above"></picture>
+</p>
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="media/red-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="media/red-dark.webp"><source type="image/avif" srcset="media/red-light.avif"><img src="media/red-light.webp" width="100%" alt="Red goes first"></picture>
+</p>
+
+<p align="center">
   <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="media/whale-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="media/whale-dark.webp"><source type="image/avif" srcset="media/whale-light.avif"><img src="media/whale-light.webp" width="100%" alt="Something rises"></picture>
 </p>
 
 <p align="center">
   <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="media/jelly-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="media/jelly-dark.webp"><source type="image/avif" srcset="media/jelly-light.avif"><img src="media/jelly-light.webp" width="100%" alt="They live on what falls"></picture>
+</p>
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="media/galaxy-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="media/galaxy-dark.webp"><source type="image/avif" srcset="media/galaxy-light.avif"><img src="media/galaxy-light.webp" width="100%" alt="Another galaxy"></picture>
+</p>
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="media/ascent-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="media/ascent-dark.webp"><source type="image/avif" srcset="media/ascent-light.avif"><img src="media/ascent-light.webp" width="100%" alt="And the rest"></picture>
 </p>
 
 <p align="center">

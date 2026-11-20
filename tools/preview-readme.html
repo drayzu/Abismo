@@ -1,0 +1,65 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>README · preview</title>
+<style>
+  body { margin: 0; font: 16px/1.5 -apple-system, "Segoe UI", sans-serif; }
+  body.dark { background: #0d1117; color: #e6edf3; color-scheme: dark; }
+  body.light { background: #ffffff; color: #1f2328; color-scheme: light; }
+  main { max-width: 830px; margin: 32px auto; padding: 0 16px; }
+  p { margin: 0 0 16px; }
+  img { max-width: 100%; }
+  code { font-size: 85%; padding: .2em .4em; border-radius: 6px; background: rgba(127,127,127,.15); }
+</style></head>
+<body><main><p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="../media/cover-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="../media/cover-dark.webp"><source type="image/avif" srcset="../media/cover-light.avif"><img src="../media/cover-light.webp" width="100%" alt="Abismo — Why go on? In the dark, two small lights. Then a front of light crosses the water, and everything that was there all along comes out of the dark."></picture>
+</p>
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="../media/above-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="../media/above-dark.webp"><source type="image/avif" srcset="../media/above-light.avif"><img src="../media/above-light.webp" width="100%" alt="What is left above"></picture>
+</p>
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="../media/red-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="../media/red-dark.webp"><source type="image/avif" srcset="../media/red-light.avif"><img src="../media/red-light.webp" width="100%" alt="Red goes first"></picture>
+</p>
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="../media/whale-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="../media/whale-dark.webp"><source type="image/avif" srcset="../media/whale-light.avif"><img src="../media/whale-light.webp" width="100%" alt="Something rises"></picture>
+</p>
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="../media/jelly-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="../media/jelly-dark.webp"><source type="image/avif" srcset="../media/jelly-light.avif"><img src="../media/jelly-light.webp" width="100%" alt="They live on what falls"></picture>
+</p>
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="../media/galaxy-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="../media/galaxy-dark.webp"><source type="image/avif" srcset="../media/galaxy-light.avif"><img src="../media/galaxy-light.webp" width="100%" alt="Another galaxy"></picture>
+</p>
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" type="image/avif" srcset="../media/ascent-dark.avif"><source media="(prefers-color-scheme: dark)" srcset="../media/ascent-dark.webp"><source type="image/avif" srcset="../media/ascent-light.avif"><img src="../media/ascent-light.webp" width="100%" alt="And the rest"></picture>
+</p>
+
+<p align="center">
+  <a href="https://drayzu.github.io/Abismo/"><picture><source media="(prefers-color-scheme: dark)" srcset="../media/enter-dark.svg"><img src="../media/enter-light.svg" width="500" alt="Open drayzu.github.io/Abismo"></picture></a>
+</p>
+
+<p align="center"><sub>This piece talks about depression and suicide. If you are thinking about it, talk to someone today.<br><a href="https://findahelpline.com">findahelpline.com</a> · helplines in your country, free</sub></p>
+
+<br>
+
+<details>
+<summary><sub>How it's made</sub></summary>
+<br>
+
+<li>The sixth piece of Horizontes (Espacio · Tiempo · Destino · Infinito · Mente · Abismo · Vida), the most personal one: one scroll down into the sea at night, and back up to the light.</li>
+<li>Everything is points: the snow that falls, a canyon only your light and the calls can reveal, a whale, a field of 320 000 sparks and the animals that light up when you move.</li>
+<li>It never starts or ends on its own: it asks first, and its last card waits.</li>
+<li>In Spanish for now. Key: <code>A</code> autoplay.</li>
+<li>TypeScript, Three.js and Vite, no framework. <code>npm install</code>, <code>npm run dev</code>; pushing to <code>main</code> deploys to GitHub Pages.</li>
+
+</details>
+</main>
+<script>
+  const t = new URLSearchParams(location.search).get('tema') ?? 'dark';
+  document.body.className = t;
+  // (the page's scheme decides which <source media=...> GitHub picks; force it here)
+  for (const s of document.querySelectorAll('source[media]')) if (t === 'light') s.remove(); else s.removeAttribute('media');
+</script></body></html>

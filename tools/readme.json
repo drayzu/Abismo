@@ -1,0 +1,9 @@
+[
+  {"nombre": "hero", "claves": [[0, 237.6], [3.0, 240.2], [6.0, 242.4], [9.0, 244.6], [12.0, 248.0]], "sub": 3, "placa": false},
+  {"nombre": "above", "b": 28.5, "d": 11.5, "n": 180, "sub": 3, "placa": false},
+  {"nombre": "red", "b": 62.5, "d": 10.5, "n": 180, "sub": 3, "placa": false},
+  {"nombre": "whale", "claves": [[0, 139.4], [2.0, 141.6], [6.0, 147.0], [9.0, 150.4]], "sub": 6, "placa": false},
+  {"nombre": "jelly", "b": 255.6, "d": 12.4, "n": 270, "sub": 4, "placa": false},
+  {"nombre": "galaxy", "b": 281.5, "d": 10.5, "n": 180, "sub": 4, "placa": false},
+  {"nombre": "ascent", "b": 347.0, "d": 12.0, "n": 180, "sub": 4, "placa": false}
+]
